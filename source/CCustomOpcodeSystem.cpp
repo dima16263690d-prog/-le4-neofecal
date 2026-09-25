@@ -909,7 +909,7 @@ namespace CLEO {
 
 	void ResetScmFunctionStore()
 	{
-		for each(ScmFunction *scmFunc in ScmFunction::Store)
+		for (ScmFunction *scmFunc : ScmFunction::Store)
 		{
 			if (scmFunc) delete scmFunc;
 		}
@@ -1642,7 +1642,7 @@ namespace CLEO {
 		SCRIPT_VAR* storedLocals = scmFunc->savedTls;
 
 		// collect arguments
-		for (DWORD i = 0; i < std::min(nParams, 32u); i++)
+		for (DWORD i = 0; i < std::min<DWORD>(nParams, 32); i++)
 		{
 			SCRIPT_VAR* arg = arguments + i;
 				
@@ -1877,7 +1877,7 @@ namespace CLEO {
 			state;
 		*thread >> hVehicle >> state;
 		auto veh = GetVehiclePool().GetAtRef(hVehicle);
-		veh->m_nVehicleFlags.bEngineOn = state != false;
+		veh->bEngineOn = state != false;
 		return OR_CONTINUE;
 	}
 
@@ -2338,7 +2338,7 @@ namespace CLEO {
 		{
 			if (auto obj = pool.GetAt(index))
 			{
-				if (pass_deads != -1 && (obj->IsPlayer() || (pass_deads && !IsAvailable(obj))/* || obj->GetOwner() == 2*/ || obj->m_nPedFlags.bFadeOut))
+				if (pass_deads != -1 && (obj->IsPlayer() || (pass_deads && !IsAvailable(obj))/* || obj->GetOwner() == 2*/ || obj->bFadeOut))
 					continue;
 
 				if (radius >= 1000.0f || (VectorSqrMagnitude(obj->GetPosition() - center) <= radius * radius))
@@ -2381,7 +2381,7 @@ namespace CLEO {
 		{
 			if (auto obj = pool.GetAt(index))
 			{
-				if ((pass_wrecked && IsWrecked(obj)) || (/*obj->GetOwner() == 2 ||*/ obj->m_nVehicleFlags.bFadeOut))
+				if ((pass_wrecked && IsWrecked(obj)) || (/*obj->GetOwner() == 2 ||*/ obj->bFadeOut))
 					continue;
 
 				if (radius >= 1000.0f || (VectorSqrMagnitude(obj->GetPosition() - center) <= radius * radius))
