@@ -1,7 +1,3 @@
-#ifndef RW
-#define RW
-#endif
-
 #include "plugin.h"
 #include "CLEO.h"
 using namespace plugin;
