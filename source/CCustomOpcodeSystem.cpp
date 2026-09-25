@@ -439,7 +439,7 @@ namespace CLEO {
 
 				if (length > 0)
 				{
-					auto count = min(size, length);
+					auto count = std::min(size, length);
 					memcpy(buf, thread->GetBytePointer(), count);
 
 					thread->IncPtr(length); // read text
@@ -957,13 +957,13 @@ namespace CLEO {
 		switch (size)
 		{
 		case 1:
-			GetInstance().CodeInjector.MemoryRead(Address, (BYTE)opcodeParams[0].ucParam, vp);
+			GetInstance().CodeInjector.MemoryRead(Address, opcodeParams[0].ucParam, vp);
 			break;
 		case 2:
-			GetInstance().CodeInjector.MemoryRead(Address, (WORD)opcodeParams[0].usParam, vp);
+			GetInstance().CodeInjector.MemoryRead(Address, opcodeParams[0].usParam, vp);
 			break;
 		case 4:
-			GetInstance().CodeInjector.MemoryRead(Address, (DWORD)opcodeParams[0].dwParam, vp);
+			GetInstance().CodeInjector.MemoryRead(Address, opcodeParams[0].dwParam, vp);
 			break;
 		default:
 			TRACE("[0A8D] Unallowed size %u", size);
@@ -1642,7 +1642,7 @@ namespace CLEO {
 		SCRIPT_VAR* storedLocals = scmFunc->savedTls;
 
 		// collect arguments
-		for (DWORD i = 0; i < min(nParams, 32); i++)
+		for (DWORD i = 0; i < std::min(nParams, 32u); i++)
 		{
 			SCRIPT_VAR* arg = arguments + i;
 				
@@ -1751,7 +1751,7 @@ namespace CLEO {
 			for (int i = 0; i < NUM_SCAN_ENTITIES; i++)
 			{
 				pVehicle = (CVehicle*)pedintel->m_vehicleScanner.m_apEntities[i];
-				if (pVehicle && pVehicle->m_nCreatedBy != 2 && !pVehicle->m_nVehicleFlags.bFadeOut)
+				if (pVehicle && pVehicle->m_nCreatedBy != 2 && !pVehicle->bFadeOut)
 					break;
 				pVehicle = nullptr;
 			}
@@ -1760,7 +1760,7 @@ namespace CLEO {
 			for (int i = 0; i < NUM_SCAN_ENTITIES; i++)
 			{
 				pPed = (CPed*)pedintel->m_pedScanner.m_apEntities[i];
-				if (pPed && pPed != pPlayerPed && (pPed->m_nCreatedBy & 0xFF) == 1 && !pPed->m_nPedFlags.bFadeOut)
+				if (pPed && pPed != pPlayerPed && (pPed->m_nCreatedBy & 0xFF) == 1 && !pPed->bFadeOut)
 					break;
 				pPed = nullptr;
 			}
@@ -1857,7 +1857,7 @@ namespace CLEO {
 	{
 		DWORD hVehicle;
 		*thread >> hVehicle;
-		SetScriptCondResult(thread, GetVehiclePool().GetAtRef(hVehicle)->m_nVehicleFlags.bSirenOrAlarm);
+		SetScriptCondResult(thread, GetVehiclePool().GetAtRef(hVehicle)->bSirenOrAlarm);
 		return OR_CONTINUE;
 	}
 
@@ -1866,7 +1866,7 @@ namespace CLEO {
 	{
 		DWORD hVehicle;
 		*thread >> hVehicle;
-		SetScriptCondResult(thread, GetVehiclePool().GetAtRef(hVehicle)->m_nVehicleFlags.bEngineOn);
+		SetScriptCondResult(thread, GetVehiclePool().GetAtRef(hVehicle)->bEngineOn);
 		return OR_CONTINUE;
 	}
 
@@ -2250,7 +2250,7 @@ namespace CLEO {
 		*thread >> mi;
 
 		CVehicleModelInfo* model;
-		// if 1.0 US, prefer GetModelInfo function — makes it compatible with fastman92's limit adjuster
+		// if 1.0 US, prefer GetModelInfo function Â— makes it compatible with fastman92's limit adjuster
 		if (CLEO::GetInstance().VersionManager.GetGameVersion() == CLEO::GV_US10) {
 			model = plugin::CallAndReturn<CVehicleModelInfo *, 0x403DA0, int>(mi);
 		}
@@ -2277,7 +2277,7 @@ namespace CLEO {
 		*thread >> mi;
 
 		CVehicleModelInfo* model;
-		// if 1.0 US, prefer GetModelInfo function — makes it compatible with fastman92's limit adjuster
+		// if 1.0 US, prefer GetModelInfo function Â— makes it compatible with fastman92's limit adjuster
 		if (CLEO::GetInstance().VersionManager.GetGameVersion() == CLEO::GV_US10) {
 			model = plugin::CallAndReturn<CVehicleModelInfo *, 0x403DA0, int>(mi);
 		}
