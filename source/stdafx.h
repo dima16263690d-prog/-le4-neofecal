@@ -20,7 +20,7 @@
 #include <cstdint>
 
 // New plugin-sdk: RenderWare types must be available before GTA SA animation/pool headers.
-#include <game_sa/RenderWare.h>
+#include <RenderWare.h>
 #include <game_sa/CPools.h>
 #include <game_sa/CMenuManager.h>
 #include <game_sa/CText.h>
