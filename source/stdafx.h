@@ -5,6 +5,12 @@
 #define WIN32_LEAN_AND_MEAN
 #undef UNICODE
 
+// CLEO 4.4.4 uses RenderWare types through the current plugin-sdk.
+// The SDK's shared RenderWare header is conditional on RW being defined.
+#ifndef RW
+#define RW
+#endif
+
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <stdio.h>
