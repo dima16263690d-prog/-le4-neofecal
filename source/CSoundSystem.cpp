@@ -203,8 +203,8 @@ namespace CLEO
             else pVec = &camera->m_placement.m_vPosn;
 
             BASS_3DVECTOR cameraPos(pVec->y, pVec->z, pVec->x);
-            BASS_3DVECTOR cameraFront(pMatrix ? pMatrix->at.y : 0.0, pMatrix ? pMatrix->at.z : -1.0, pMatrix ? pMatrix->at.x : 0.0);
-            BASS_3DVECTOR cameraTop(pMatrix ? pMatrix->up.y : 0.0, pMatrix ? pMatrix->up.z : 0.0, pMatrix ? pMatrix->up.x : 1.0);
+            BASS_3DVECTOR cameraFront(pMatrix ? pMatrix->at.y : 0.0f, pMatrix ? pMatrix->at.z : -1.0f, pMatrix ? pMatrix->at.x : 0.0f);
+            BASS_3DVECTOR cameraTop(pMatrix ? pMatrix->up.y : 0.0f, pMatrix ? pMatrix->up.z : 0.0f, pMatrix ? pMatrix->up.x : 1.0f);
 
             BASS_Set3DPosition(
                 &cameraPos,
