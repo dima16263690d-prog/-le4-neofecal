@@ -126,12 +126,12 @@ inline CEntity* GetWeaponTarget(CPed* pSelf)
 
 inline bool IsAvailable(CPed* pSelf)
 {
-    return pSelf->m_nPedState != PEDSTATE_DIE && pSelf->m_nPedState != PEDSTATE_DEAD;
+    return pSelf->m_ePedState != PEDSTATE_DIE && pSelf->m_ePedState != PEDSTATE_DEAD;
 }
 
 inline bool	IsWrecked(CVehicle* pSelf)
 {
-    return pSelf->m_nStatus == STATUS_WRECKED || pSelf->m_nVehicleFlags.bIsDrowning;
+    return pSelf->m_nStatus == STATUS_WRECKED || pSelf->bIsDrowning;
 }
 
 
