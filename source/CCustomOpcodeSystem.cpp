@@ -870,7 +870,7 @@ namespace CLEO {
 			cs->LogicalOp = eLogicalOperation::NONE;
 			cs->NotFlag = false;
 
-			cs->SetScmFunction(thisScmFunctionId = allocationPlace);
+			cs->SetScmFunction(thisScmFunctionId = static_cast<unsigned short>(allocationPlace));
 		}
 
 		void Return(CRunningScript *thread)
@@ -931,10 +931,10 @@ namespace CLEO {
 		switch (size)
 		{
 		default:
-			GetInstance().CodeInjector.MemoryWrite<BYTE>(Address, value, vp, size);
+			GetInstance().CodeInjector.MemoryWrite<BYTE>(Address, static_cast<BYTE>(value), vp, size);
 			break;
 		case 2:
-			GetInstance().CodeInjector.MemoryWrite<WORD>(Address, value, vp);
+			GetInstance().CodeInjector.MemoryWrite<WORD>(Address, static_cast<WORD>(value), vp);
 			break;
 		case 4:
 			GetInstance().CodeInjector.MemoryWrite<DWORD>(Address, value, vp);
