@@ -13,7 +13,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release GTASA|Win32'"><OutDir>$(SolutionDir)output\</OutDir><IntDir>$(ProjectDir).obj\Release\</IntDir><TargetName>IntOperations</TargetName><TargetExt>.cleo</TargetExt></PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel><SDLCheck>true</SDLCheck><AdditionalIncludeDirectories>$(PLUGIN_SDK_DIR)\plugin_sa;$(PLUGIN_SDK_DIR)\plugin_sa\game_sa;$(PLUGIN_SDK_DIR)\shared;$(PLUGIN_SDK_DIR)\shared\game;$(SolutionDir)cleo_sdk;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <WarningLevel>Level3</WarningLevel><SDLCheck>true</SDLCheck><AdditionalIncludeDirectories>$(PLUGIN_SDK_DIR)\plugin_sa;$(PLUGIN_SDK_DIR)\plugin_sa\game_sa;$(PLUGIN_SDK_DIR)\plugin_sa\game_sa\enums;$(PLUGIN_SDK_DIR)\shared;$(PLUGIN_SDK_DIR)\shared\game;$(SolutionDir)cleo_sdk;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>GTASA;GTAGAME_NAME="San Andreas";GTAGAME_ABBR="SA";GTAGAME_ABBRLOW="sa";GTAGAME_PROTAGONISTNAME="CJ";GTAGAME_CITYNAME="San Andreas";_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug GTASA|Win32'">MultiThreadedDebug</RuntimeLibrary><RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Release GTASA|Win32'">MultiThreaded</RuntimeLibrary>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug GTASA|Win32'">Disabled</Optimization><Optimization Condition="'$(Configuration)|$(Platform)'=='Release GTASA|Win32'">MaxSpeed</Optimization>
