@@ -1013,7 +1013,7 @@ namespace CLEO
 				is.exceptions(std::ios::badbit | std::ios::failbit);
 				std::size_t length;
 				is.seekg(0, std::ios::end);
-				length = is.tellg();
+				length = static_cast<std::size_t>(is.tellg());
 				is.seekg(0, std::ios::beg);
 
 				if (bIsMiss)
