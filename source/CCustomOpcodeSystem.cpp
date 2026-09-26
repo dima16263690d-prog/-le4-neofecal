@@ -1826,7 +1826,20 @@ namespace CLEO {
 	OpcodeResult __stdcall opcode_0ABA(CRunningScript *thread)
 	{
 		char *threadName = readString(thread);
-		auto deleted_thread = GetInstance().ScriptEngine.FindCustomScriptNamed(threadName);
+		CCustomScript *deleted_thread = nullptr;
+
+		// With multiple custom streams sharing one name (parent + 0E6F children),
+		// prefer terminating the current custom thread when its name matches.
+		// The legacy fallback remains for explicitly targeting another name.
+		if (thread->IsCustom() && _stricmp(thread->GetName(), threadName) == 0)
+		{
+			deleted_thread = reinterpret_cast<CCustomScript *>(thread);
+		}
+		else
+		{
+			deleted_thread = GetInstance().ScriptEngine.FindCustomScriptNamed(threadName);
+		}
+
 		if (deleted_thread)
 		{
 			GetInstance().ScriptEngine.RemoveCustomScript(deleted_thread);
