@@ -887,14 +887,22 @@ namespace CLEO
 
     void CScriptEngine::RemoveCustomScript(CCustomScript *cs)
     {
-		if (cs->parentThread)
-		{
-			cs->BaseIP = 0; // don't delete BaseIP if child thread
-		}
-		for (auto childThread : cs->childThreads)
-		{
-			CScriptEngine::RemoveCustomScript(childThread);
-		}
+        // Detach this script from its parent first so removing a child cannot
+        // leave a stale pointer in the parent's child list.
+        if (cs->parentThread)
+        {
+            cs->parentThread->childThreads.remove(cs);
+            cs->parentThread = nullptr;
+        }
+
+        // Remove children one by one. RemoveCustomScript(child) detaches the
+        // child from this list, so iterating with an explicit front() is safe.
+        while (!cs->childThreads.empty())
+        {
+            CCustomScript *childThread = cs->childThreads.front();
+            CScriptEngine::RemoveCustomScript(childThread);
+        }
+
         if (cs == CustomMission)
         {
             TRACE("Unregistering custom mission named %s", cs->Name);
@@ -917,47 +925,28 @@ namespace CLEO
                 ScriptsWaitingForDelete.push_back(cs);
             }
 
-            //TRACE("Psyke!");
-
             CustomScripts.remove(cs);
             RemoveScriptFromQueue(cs, activeThreadQueue);
             cs->SetActive(false);
-
-            /*if(!pScript->IsMission()) *MissionLoaded = false;
-            RemoveScriptFromQueue(pScript, activeThreadQueue);
-            AddScriptToQueue(pScript, inactiveThreadQueue);
-            StopScript(pScript);*/
         }
     }
 
     void CScriptEngine::RemoveAllCustomScripts(void)
     {
         InactiveScriptHashes.clear();
-        std::for_each(CustomScripts.begin(), CustomScripts.end(), [this](CCustomScript *cs) {
-            TRACE("Unregistering custom script named %s", cs->Name);
-            RemoveScriptFromQueue(cs, activeThreadQueue);
-            //AddScriptToQueue(cs, inactiveThreadQueue);
-            //if(cs->GetPrev()) cs->GetPrev()->SetNext(nullptr);
-            //if(cs->GetNext()) cs->GetNext()->SetPrev(nullptr);
-            //TRACE("Psyke!!");
-            cs->SetActive(false);
-            delete cs;
-        });
-        CustomScripts.clear();
-        std::for_each(ScriptsWaitingForDelete.begin(), ScriptsWaitingForDelete.end(), [this](CCustomScript *cs) {
+
+        if (CustomMission)
+            RemoveCustomScript(CustomMission);
+
+        while (!CustomScripts.empty())
+            RemoveCustomScript(CustomScripts.back());
+
+        for (auto cs : ScriptsWaitingForDelete)
+        {
             TRACE("Deleting inactive script named %s", cs->Name);
             delete cs;
-        });
-        ScriptsWaitingForDelete.clear();
-        if (CustomMission)
-        {
-            TRACE("Unregistering custom mission named %s", CustomMission->Name);
-            RemoveScriptFromQueue(CustomMission, activeThreadQueue);
-            CustomMission->SetActive(false);
-            delete CustomMission;
-            CustomMission = nullptr;
-            *MissionLoaded = false;
         }
+        ScriptsWaitingForDelete.clear();
     }
 
     void CScriptEngine::UnregisterAllScripts()
@@ -980,9 +969,9 @@ namespace CLEO
 
 	// TODO: Consider split into 2 classes: CCustomExternalScript, CCustomChildScript
     CCustomScript::CCustomScript(const char *szFileName, bool bIsMiss, CCustomScript *parent, int label)
-        : CRunningScript(), bSaveEnabled(false), bOK(false),
+        : CRunningScript(), ownedBuffer(nullptr), bSaveEnabled(false), bOK(false),
         LastSearchPed(0), LastSearchCar(0), LastSearchObj(0),
-        CompatVer(CLEO_VERSION)
+        CompatVer(CLEO_VERSION), parentThread(nullptr)
     {
         IsCustom(1);
         bIsMission = bUseMissionCleanup = bIsMiss;
@@ -1024,7 +1013,8 @@ namespace CLEO
 					BaseIP = CurrentIP = missionBlock;
 				}
 				else {
-					BaseIP = CurrentIP = new BYTE[length];
+					ownedBuffer = new BYTE[length];
+					BaseIP = CurrentIP = ownedBuffer;
 				}
 				is.read(reinterpret_cast<char *>(BaseIP), length);
 
@@ -1052,10 +1042,19 @@ namespace CLEO
 
     CCustomScript::~CCustomScript()
     {
-        if (BaseIP && !bIsMission) delete[] BaseIP;
+        if (parentThread)
+        {
+            parentThread->childThreads.remove(this);
+            parentThread = nullptr;
+        }
+
+        if (ownedBuffer)
+            delete[] ownedBuffer;
+
 		RunScriptDeleteDelegate(reinterpret_cast<CRunningScript*>(this));
 		if (lastScriptCreated == this) lastScriptCreated = nullptr;
     }
+
 
 	float VectorSqrMagnitude(CVector vector) { return vector.x * vector.x + vector.y * vector.y + vector.z * vector.z; }
 }
