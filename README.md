@@ -131,3 +131,12 @@ CCustomScript
 ### Проверка перед runtime-тестом
 
 После сборки нужно отдельно проверить старые скрипты и opcode compatibility, а затем повторить тесты одного parent + двух child через 0E6F. Stage 2 (несколько потоков, 0ABA, 0E70, завершение child) и Stage 3 (Save/Load child-state) пока не изменяются.
+
+
+### Stage 2/3 — parallel custom streams and child save state
+
+- Custom children created from a label inherit the parent CLEO compatibility version.
+- `0ABA` prefers terminating the current custom thread when parent and child share the same 8-byte script name; legacy name lookup remains the fallback.
+- Child streams are never written into the legacy hash-only saved-thread list.
+- Child state is stored in a separate `csN.children.sav` sidecar. The legacy `csN.sav` header and record layout remain unchanged.
+- The sidecar stores parent/child node IDs, label, sibling ordinal, locals, timers, IP offset, condition/logical state and name, allowing nested child streams to be restored when their parent recreates them.
