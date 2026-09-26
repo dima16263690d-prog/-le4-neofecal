@@ -889,10 +889,19 @@ namespace CLEO
         {
             for (size_t i = 0; i < safe_header.n_saved_threads; ++i)
             {
+                if (safeInfoUsed.size() > i && safeInfoUsed[i])
+                    continue;
+
                 if (safe_info[i].hash == cs->dwChecksum)
                 {
                     TRACE("Custom script %s found in the safe-list", szFilePath);
                     safe_info[i].Apply(cs);
+
+                    if (safeInfoUsed.size() > i)
+                    {
+                        safeInfoUsed[i] = true;
+                        cs->savedNodeId = 0x80000000u | static_cast<unsigned>(i + 1);
+                    }
                     break;
                 }
             }
