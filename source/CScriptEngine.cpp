@@ -751,38 +751,62 @@ namespace CLEO
         if (!parent || parent->savedNodeId == 0)
             return;
 
-        for (size_t i = 0; i < pendingChildSaves.size(); )
+        for (;;)
         {
-            if (pendingChildSaves[i].parent_node_id != parent->savedNodeId)
+            size_t found = pendingChildSaves.size();
+
+            // Restore children in ordinal order for each label. This keeps
+            // duplicate labels (for example two 0E6F streams at the same
+            // label) deterministic.
+            for (size_t i = 0; i < pendingChildSaves.size(); ++i)
             {
-                ++i;
-                continue;
+                if (pendingChildSaves[i].parent_node_id != parent->savedNodeId)
+                    continue;
+
+                bool lowerOrdinalPending = false;
+                for (size_t j = 0; j < pendingChildSaves.size(); ++j)
+                {
+                    if (pendingChildSaves[j].parent_node_id == parent->savedNodeId &&
+                        pendingChildSaves[j].label == pendingChildSaves[i].label &&
+                        pendingChildSaves[j].ordinal < pendingChildSaves[i].ordinal)
+                    {
+                        lowerOrdinalPending = true;
+                        break;
+                    }
+                }
+
+                if (!lowerOrdinalPending)
+                {
+                    found = i;
+                    break;
+                }
             }
 
-            const int label = pendingChildSaves[i].label;
-            auto child = new CCustomScript(parent->Name, false, parent, label);
+            if (found == pendingChildSaves.size())
+                break;
+
+            ChildThreadSavingInfo saved = pendingChildSaves[found];
+            pendingChildSaves.erase(pendingChildSaves.begin() + found);
+
+            auto child = new CCustomScript(parent->Name, false, parent, saved.label);
             if (!child || !child->IsOK())
             {
                 if (child)
                     delete child;
 
-                TRACE("Failed to recreate custom child script for parent=%08X label=%d",
-                    parent->savedNodeId, label);
-                ++i;
+                TRACE("Failed to recreate custom child script for parent=%08X node=%u label=%d ordinal=%u",
+                    parent->savedNodeId, saved.node_id, saved.label, saved.ordinal);
                 continue;
             }
 
             AddCustomScript(child);
-            RestorePendingChildScript(parent, child, label);
-            RestorePendingChildTree(child);
+            saved.Apply(child);
+            child->savedNodeId = saved.node_id;
 
-            // RestorePendingChildScript removes the matching record.
-            // Keep the same index so the next pending child shifts into place.
-            if (i < pendingChildSaves.size() &&
-                pendingChildSaves[i].parent_node_id == parent->savedNodeId)
-            {
-                ++i;
-            }
+            TRACE("Restored custom child script '%s' from sidecar parent=%08X node=%u label=%d ordinal=%u",
+                child->Name, parent->savedNodeId, saved.node_id, saved.label, saved.ordinal);
+
+            RestorePendingChildTree(child);
         }
     }
 
