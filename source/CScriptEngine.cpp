@@ -707,6 +707,44 @@ namespace CLEO
     std::vector<ChildThreadSavingInfo> pendingChildSaves;
     std::vector<bool> safeInfoUsed;
 
+    void CScriptEngine::RestorePendingChildScript(CCustomScript *parent, CCustomScript *child, int label)
+    {
+        if (!parent || !child || parent->savedNodeId == 0)
+            return;
+
+        unsigned ordinal = 0;
+        for (auto sibling : parent->childThreads)
+        {
+            if (sibling->childLabel != label)
+                continue;
+
+            if (sibling == child)
+                break;
+
+            ++ordinal;
+        }
+
+        for (auto it = pendingChildSaves.begin(); it != pendingChildSaves.end(); ++it)
+        {
+            if (it->parent_node_id != parent->savedNodeId ||
+                it->label != label ||
+                it->ordinal != ordinal)
+            {
+                continue;
+            }
+
+            const unsigned nodeId = it->node_id;
+            it->Apply(child);
+            child->savedNodeId = nodeId;
+
+            TRACE("Restored custom child script '%s' from sidecar parent=%08X node=%u label=%d ordinal=%u",
+                child->Name, parent->savedNodeId, nodeId, label, ordinal);
+
+            pendingChildSaves.erase(it);
+            return;
+        }
+    }
+
     void CScriptEngine::LoadCustomScripts(bool load_mode)
     {
         char safe_name[MAX_PATH];
@@ -720,6 +758,8 @@ namespace CLEO
         safe_info = nullptr;
         stopped_info = nullptr;
         safe_header.n_saved_threads = safe_header.n_stopped_threads = 0;
+        pendingChildSaves.clear();
+        safeInfoUsed.clear();
 
         if (load_mode)
         {
@@ -741,6 +781,7 @@ namespace CLEO
                     ReadBinary(ss, CleoVariables, 0x400);
                     ReadBinary(ss, safe_info, safe_header.n_saved_threads);
                     ReadBinary(ss, stopped_info, safe_header.n_stopped_threads);
+                    safeInfoUsed.assign(safe_header.n_saved_threads, false);
                     for (size_t i = 0; i < safe_header.n_stopped_threads; ++i)
                         InactiveScriptHashes.insert(stopped_info[i]);
                     TRACE("Finished. Loaded %u cleo variables, %u saved threads info, %u stopped threads info",
@@ -761,6 +802,39 @@ namespace CLEO
         else
         {
             memset(CleoVariables, 0, sizeof(CleoVariables));
+        }
+
+        if (load_mode)
+        {
+            try
+            {
+                int nSlot = gvm.GetGameVersion() != GV_STEAM ? *(BYTE*)&MenuManager->m_nSelectedSaveGame : *((BYTE*)MenuManager + 0x15B);
+                char child_safe_name[MAX_PATH];
+                _snprintf_s(child_safe_name, sizeof(child_safe_name), _TRUNCATE,
+                    "./cleo/cleo_saves/cs%d.children.sav", nSlot);
+
+                std::ifstream cs(child_safe_name, std::ios::binary);
+                if (cs.is_open())
+                {
+                    cs.exceptions(std::ios::eofbit | std::ios::badbit | std::ios::failbit);
+
+                    ChildSaveHeader header{};
+                    ReadBinary(cs, header);
+                    if (header.signature != ChildSaveHeader::sign || header.version != ChildSaveHeader::version)
+                        throw std::runtime_error("Invalid child save format");
+
+                    pendingChildSaves.resize(header.n_children);
+                    if (header.n_children)
+                        ReadBinary(cs, pendingChildSaves.data(), header.n_children);
+
+                    TRACE("Loaded %u child custom script states from %s", header.n_children, child_safe_name);
+                }
+            }
+            catch (std::exception& ex)
+            {
+                pendingChildSaves.clear();
+                TRACE("Loading child script state failed: %s", ex.what());
+            }
         }
 
         char cwd[MAX_PATH];
