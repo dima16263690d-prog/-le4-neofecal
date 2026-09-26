@@ -18,7 +18,7 @@ public:
 extern CDiagnosticLog DiagnosticLog;
 
 #ifdef DEBUGIT
-#define DIAG(format,...) { DiagnosticLog.Trace(format, __VA_ARGS__); }
+#define DIAG(...) { DiagnosticLog.Trace(__VA_ARGS__); }
 #else
 #define DIAG(...) __noop
 #endif
