@@ -351,6 +351,43 @@ namespace CLEO
         ThreadSavingInfo() { }
     };
 
+
+    // Stage 3: child custom-script state is stored in a sidecar file so the
+    // legacy cs*.sav binary layout remains byte-for-byte compatible.
+    struct ChildSaveHeader
+    {
+        const static unsigned sign;
+        unsigned signature;
+        unsigned version;
+        unsigned n_children;
+    };
+
+    const unsigned ChildSaveHeader::sign = 0x31484343; // CCH1
+    const unsigned ChildSaveHeader::version = 1;
+
+    struct ChildThreadSavingInfo
+    {
+        unsigned node_id;
+        unsigned parent_node_id;
+        int label;
+        unsigned ordinal;
+        ThreadSavingInfo state;
+
+        ChildThreadSavingInfo() : node_id(0), parent_node_id(0), label(0), ordinal(0) {}
+        ChildThreadSavingInfo(CCustomScript *cs, unsigned parentId, unsigned nodeId, unsigned childOrdinal)
+            : node_id(nodeId), parent_node_id(parentId), label(cs->childLabel), ordinal(childOrdinal), state(cs)
+        {
+        }
+
+        void Apply(CCustomScript *cs)
+        {
+            state.Apply(cs);
+            // Child streams are represented by the sidecar, not by the legacy
+            // hash-only saved-thread list.
+            cs->bSaveEnabled = false;
+        }
+    };
+
     SCRIPT_VAR CScriptEngine::CleoVariables[0x400];
 
     template<typename T>
@@ -667,6 +704,8 @@ namespace CLEO
     unsigned long *stopped_info;
     std::unique_ptr<ThreadSavingInfo[]> safe_info_utilizer;
     std::unique_ptr<unsigned long[]> stopped_info_utilizer;
+    std::vector<ChildThreadSavingInfo> pendingChildSaves;
+    std::vector<bool> safeInfoUsed;
 
     void CScriptEngine::LoadCustomScripts(bool load_mode)
     {
