@@ -1687,14 +1687,15 @@ namespace CLEO {
 		// all areguments read
 		scmFunc->retnAddress = thread->GetBytePointer();
 
-		// pass arguments as new scope local variables
-		memcpy(locals, arguments, nParams * sizeof(SCRIPT_VAR));
+		// pass at most 32 arguments into the 32 available local variables
+		const DWORD storedParams = std::min<DWORD>(nParams, 32);
+		memcpy(locals, arguments, storedParams * sizeof(SCRIPT_VAR));
 
 		// initialize rest of new scope local variables
 		auto cs = reinterpret_cast<CCustomScript*>(thread);
 		if (cs->IsCustom() && cs->GetCompatibility() >= CLEO_VER_4_MIN) // CLEO 3 did not initialised local variables
 		{
-			for (DWORD i = nParams; i < 32; i++)
+			for (DWORD i = storedParams; i < 32; i++)
 			{
 				cs->SetIntVar(i, 0); // fill with zeros
 			}
@@ -2490,7 +2491,8 @@ namespace CLEO {
 				break;
 			default:
 				*thread >> str;
-				strcpy(str, ffd.cFileName);
+				if (str)
+					strncpy_s(str, 16, ffd.cFileName, _TRUNCATE);
 			}
 			SetScriptCondResult(thread, true);
 		}
@@ -2534,7 +2536,8 @@ namespace CLEO {
 				break;
 			default:
 				*thread >> str;
-				strcpy(str, ffd.cFileName);
+				if (str)
+					strncpy_s(str, 16, ffd.cFileName, _TRUNCATE);
 			}
 			SetScriptCondResult(thread, true);
 		}
@@ -2738,7 +2741,10 @@ extern "C"
 	void WINAPI CLEO_WriteStringOpcodeParam(CRunningScript* thread, LPCSTR str)
 	{
 		auto dst = (char *)GetScriptParamPointer(thread);
-		memcpy(dst, str, 16);
+		if (!dst)
+			return;
+
+		strncpy_s(dst, 16, str ? str : "", _TRUNCATE);
 		dst[15] = '\0';
 	}
 
