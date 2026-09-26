@@ -358,7 +358,7 @@ namespace CLEO
     {
         const static unsigned sign;
         unsigned signature;
-        unsigned version;
+        const static unsigned version;
         unsigned n_children;
     };
 
@@ -375,7 +375,7 @@ namespace CLEO
 
         ChildThreadSavingInfo() : node_id(0), parent_node_id(0), label(0), ordinal(0) {}
         ChildThreadSavingInfo(CCustomScript *cs, unsigned parentId, unsigned nodeId, unsigned childOrdinal)
-            : node_id(nodeId), parent_node_id(parentId), label(cs->childLabel), ordinal(childOrdinal), state(cs)
+            : node_id(nodeId), parent_node_id(parentId), label(cs->GetChildLabel()), ordinal(childOrdinal), state(cs)
         {
         }
 
@@ -384,7 +384,7 @@ namespace CLEO
             state.Apply(cs);
             // Child streams are represented by the sidecar, not by the legacy
             // hash-only saved-thread list.
-            cs->bSaveEnabled = false;
+            cs->enable_saving(false);
         }
     };
 
