@@ -917,7 +917,7 @@ namespace CLEO
         {
             std::list<CCustomScript *> savedThreads;
             std::for_each(CustomScripts.begin(), CustomScripts.end(), [this, &savedThreads](CCustomScript *cs) {
-                if (cs->bSaveEnabled)
+                if (cs->bSaveEnabled && cs->parentThread == nullptr)
                     savedThreads.push_back(cs);
             });
 
@@ -1076,6 +1076,8 @@ namespace CLEO
 
     void CScriptEngine::RemoveCustomScript(CCustomScript *cs)
     {
+        const bool wasChild = cs->parentThread != nullptr;
+
         // Detach this script from its parent first so removing a child cannot
         // leave a stale pointer in the parent's child list.
         if (cs->parentThread)
@@ -1103,7 +1105,7 @@ namespace CLEO
         }
         else
         {
-            if (cs->bSaveEnabled)
+            if (cs->bSaveEnabled && !wasChild)
             {
                 InactiveScriptHashes.insert(cs->dwChecksum);
                 TRACE("Stopping custom script named %s", cs->Name);
