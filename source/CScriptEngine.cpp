@@ -794,7 +794,6 @@ namespace CLEO
                 if (child)
                     delete child;
 
-                DIAG("[CLEO][ERROR][CUSTOM] restore failed parent_node=%08X node=%u label=%d ordinal=%u",
                     parent->savedNodeId, saved.node_id, saved.label, saved.ordinal);
                 continue;
             }
@@ -803,7 +802,6 @@ namespace CLEO
             saved.Apply(child);
             child->savedNodeId = saved.node_id;
 
-            DIAG("[CLEO][CUSTOM][RESTORE] parent=%.*s parent_node=%08X node=%u label=%d ordinal=%u",
                 8, parent->Name, parent->savedNodeId, saved.node_id, saved.label, saved.ordinal);
 
             RestorePendingChildTree(child);
@@ -892,13 +890,11 @@ namespace CLEO
                     if (header.n_children)
                         ReadBinary(cs, pendingChildSaves.data(), header.n_children);
 
-                    DIAG("[CLEO][LOAD][CUSTOM] loaded child states=%u file=%s", header.n_children, child_safe_name);
                 }
             }
             catch (std::exception& ex)
             {
                 pendingChildSaves.clear();
-                DIAG("[CLEO][ERROR][LOAD] child state load failed: %s", ex.what());
             }
         }
 
@@ -1088,17 +1084,14 @@ namespace CLEO
                     if (!childSaves.empty())
                         WriteBinary(childFile, childSaves.data(), childSaves.size());
 
-                    DIAG("[CLEO][SAVE][CUSTOM] saved child states=%u file=%s",
                         childHeader.n_children, child_safe_name);
                 }
                 else
                 {
-                    DIAG("[CLEO][ERROR][SAVE] child state file write failed file=%s", child_safe_name);
                 }
             }
             catch (std::exception& ex)
             {
-                DIAG("[CLEO][ERROR][SAVE] child state save failed: %s", ex.what());
             }
         }
         catch (std::exception& ex)
@@ -1138,13 +1131,11 @@ namespace CLEO
         if (cs->IsMission())
         {
             TRACE("Registering custom mission named %.*s", 8, cs->Name);
-            DIAG("[CLEO][CUSTOM][REGISTER] mission name=%.*s", 8, cs->Name);
             CustomMission = cs;
         }
         else
         {
             TRACE("Registering custom script named %.*s", 8, cs->Name);
-            DIAG("[CLEO][CUSTOM][REGISTER] name=%.*s parent=%p label=%d", 8, cs->Name, cs->parentThread, cs->childLabel);
             CustomScripts.push_back(cs);
         }
         AddScriptToQueue(cs, activeThreadQueue);
@@ -1174,7 +1165,6 @@ namespace CLEO
         if (cs == CustomMission)
         {
             TRACE("Unregistering custom mission named %.*s", 8, cs->Name);
-            DIAG("[CLEO][CUSTOM][END] mission name=%.*s", 8, cs->Name);
             RemoveScriptFromQueue(CustomMission, activeThreadQueue);
             ScriptsWaitingForDelete.push_back(cs);
             CustomMission->SetActive(false);
@@ -1187,12 +1177,10 @@ namespace CLEO
             {
                 InactiveScriptHashes.insert(cs->dwChecksum);
                 TRACE("Stopping custom script named %.*s", 8, cs->Name);
-                DIAG("[CLEO][CUSTOM][STOP] name=%.*s parent=%p label=%d", 8, cs->Name, cs->parentThread, cs->childLabel);
             }
             else
             {
                 TRACE("Unregistering custom script named %.*s", 8, cs->Name);
-                DIAG("[CLEO][CUSTOM][END] name=%.*s parent=%p label=%d", 8, cs->Name, cs->parentThread, cs->childLabel);
                 ScriptsWaitingForDelete.push_back(cs);
             }
 
@@ -1215,7 +1203,6 @@ namespace CLEO
         for (auto cs : ScriptsWaitingForDelete)
         {
             TRACE("Deleting inactive script named %.*s", 8, cs->Name);
-            DIAG("[CLEO][CUSTOM][DELETE] name=%.*s", 8, cs->Name);
             delete cs;
         }
         ScriptsWaitingForDelete.clear();
@@ -1224,7 +1211,6 @@ namespace CLEO
     void CScriptEngine::UnregisterAllScripts()
     {
         TRACE("Unregistering all custom scripts");
-        DIAG("[CLEO][CUSTOM][UNREGISTER_ALL]");
         std::for_each(CustomScripts.begin(), CustomScripts.end(), [this](CCustomScript *cs) {
             RemoveScriptFromQueue(cs, activeThreadQueue);
             cs->SetActive(false);
@@ -1234,7 +1220,6 @@ namespace CLEO
     void CScriptEngine::ReregisterAllScripts()
     {
         TRACE("Reregistering all custom scripts");
-        DIAG("[CLEO][CUSTOM][REREGISTER_ALL]");
         std::for_each(CustomScripts.begin(), CustomScripts.end(), [this](CCustomScript *cs) {
             AddScriptToQueue(cs, activeThreadQueue);
             cs->SetActive(true);
@@ -1254,7 +1239,6 @@ namespace CLEO
         NumTexts = 0;
 
         TRACE("Loading custom script %s...", szFileName);
-        DIAG("[CLEO][CUSTOM][LOAD] file=%s parent=%p label=%d", szFileName, parent, label);
 
         try
         {
@@ -1311,14 +1295,6 @@ namespace CLEO
 			}
 			lastScriptCreated = this;
             bOK = true;
-            if (parent)
-            {
-                DIAG("[CLEO][CUSTOM][CREATE] name=%.*s parent=%.*s label=%d", 8, Name, 8, parent->Name, label);
-            }
-            else
-            {
-                DIAG("[CLEO][CUSTOM][CREATE] name=%.*s root=1", 8, Name);
-            }
         }
         catch (std::exception& e)
         {
