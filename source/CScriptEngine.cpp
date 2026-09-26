@@ -1028,9 +1028,11 @@ namespace CLEO
 				}
 				is.read(reinterpret_cast<char *>(BaseIP), length);
 
-				auto fname = strrchr(szFileName, '\\') + 1;
-				if (!fname) fname = strrchr(szFileName, '/') + 1;
-				if (fname < szFileName) fname = szFileName;
+				const char *fname = strrchr(szFileName, '\\');
+				const char *slash = strrchr(szFileName, '/');
+				if (slash && (!fname || slash > fname)) fname = slash;
+				if (fname) ++fname;
+				else fname = szFileName;
 				memcpy(Name, fname, sizeof(Name));
 				Name[7] = '\0';
 				dwChecksum = crc32(reinterpret_cast<BYTE *>(BaseIP), length);
