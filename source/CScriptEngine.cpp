@@ -746,6 +746,46 @@ namespace CLEO
         }
     }
 
+    void CScriptEngine::RestorePendingChildTree(CCustomScript *parent)
+    {
+        if (!parent || parent->savedNodeId == 0)
+            return;
+
+        for (size_t i = 0; i < pendingChildSaves.size(); )
+        {
+            if (pendingChildSaves[i].parent_node_id != parent->savedNodeId)
+            {
+                ++i;
+                continue;
+            }
+
+            const int label = pendingChildSaves[i].label;
+            auto child = new CCustomScript(parent->Name, false, parent, label);
+            if (!child || !child->IsOK())
+            {
+                if (child)
+                    delete child;
+
+                TRACE("Failed to recreate custom child script for parent=%08X label=%d",
+                    parent->savedNodeId, label);
+                ++i;
+                continue;
+            }
+
+            AddCustomScript(child);
+            RestorePendingChildScript(parent, child, label);
+            RestorePendingChildTree(child);
+
+            // RestorePendingChildScript removes the matching record.
+            // Keep the same index so the next pending child shifts into place.
+            if (i < pendingChildSaves.size() &&
+                pendingChildSaves[i].parent_node_id == parent->savedNodeId)
+            {
+                ++i;
+            }
+        }
+    }
+
     void CScriptEngine::LoadCustomScripts(bool load_mode)
     {
         char safe_name[MAX_PATH];
@@ -845,15 +885,25 @@ namespace CLEO
         TRACE("Searching for cleo scripts");
 
         FilesWalk(cs_mask, [this](const char *filename) {
-            LoadScript(filename);
+            auto cs = LoadScript(filename);
+            if (cs)
+                RestorePendingChildTree(cs);
         });
         FilesWalk(cs4_mask, [this](const char *filename) {
             auto cs = LoadScript(filename);
-            if (cs) cs->SetCompatibility(CLEO_VER_4);
+            if (cs)
+            {
+                cs->SetCompatibility(CLEO_VER_4);
+                RestorePendingChildTree(cs);
+            }
         });
         FilesWalk(cs3_mask, [this](const char *filename) {
             auto cs = LoadScript(filename);
-            if (cs) cs->SetCompatibility(CLEO_VER_3);
+            if (cs)
+            {
+                cs->SetCompatibility(CLEO_VER_3);
+                RestorePendingChildTree(cs);
+            }
         });
 
         _chdir(cwd);
