@@ -4,6 +4,7 @@
 #include "CCodeInjector.h"
 #include "CGameVersionManager.h"
 #include "CDebug.h"
+#include "CDiagnosticLog.h"
 #include "CDmaFix.h"
 #include "CGameMenu.h"
 #include "CPluginSystem.h"
