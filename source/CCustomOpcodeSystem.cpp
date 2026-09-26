@@ -2871,6 +2871,9 @@ extern "C"
 		{
 			GetInstance().ScriptEngine.AddCustomScript(cs);
 			if (fromThread) TransmitScriptParams(fromThread, cs);
+			if (fromThread && label != 0)
+				GetInstance().ScriptEngine.RestorePendingChildScript(
+					reinterpret_cast<CCustomScript *>(fromThread), cs, label);
 		}
 		else
 		{
