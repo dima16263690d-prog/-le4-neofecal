@@ -923,12 +923,49 @@ namespace CLEO
 
             CleoSafeHeader header = { CleoSafeHeader::sign, savedThreads.size(), InactiveScriptHashes.size() };
 
+            // Assign stable node ids for this save operation. Root scripts use
+            // the legacy saved-thread index; child scripts use a separate id
+            // space stored only in the sidecar file.
+            unsigned rootIndex = 0;
+            for (auto cs : savedThreads)
+                cs->savedNodeId = 0x80000000u | (++rootIndex);
+
+            std::vector<ChildThreadSavingInfo> childSaves;
+            unsigned nextChildNodeId = 1;
+
+            auto collectChildren = [&](auto&& self, CCustomScript *parent, unsigned parentNodeId) -> void
+            {
+                for (auto child : parent->childThreads)
+                {
+                    unsigned ordinal = 0;
+                    for (auto sibling : parent->childThreads)
+                    {
+                        if (sibling->childLabel != child->childLabel)
+                            continue;
+                        if (sibling == child)
+                            break;
+                        ++ordinal;
+                    }
+
+                    const unsigned nodeId = nextChildNodeId++;
+                    child->savedNodeId = nodeId;
+                    childSaves.emplace_back(child, parentNodeId, nodeId, ordinal);
+                    self(self, child, nodeId);
+                }
+            };
+
+            for (auto root : savedThreads)
+                collectChildren(collectChildren, root, root->savedNodeId);
+
             // steam offset is different, so get it manually for now
             CGameVersionManager& gvm = GetInstance().VersionManager;
             int nSlot = gvm.GetGameVersion() != GV_STEAM ? *(BYTE*)&MenuManager->m_nSelectedSaveGame : *((BYTE*)MenuManager + 0x15B);
 
             char safe_name[MAX_PATH];
+            char child_safe_name[MAX_PATH];
             sprintf(safe_name, "./cleo/cleo_saves/cs%d.sav", nSlot);
+            _snprintf_s(child_safe_name, sizeof(child_safe_name), _TRUNCATE,
+                "./cleo/cleo_saves/cs%d.children.sav", nSlot);
             TRACE("Saving script engine state to the file %s", safe_name);
 
             CreateDirectory("cleo", NULL);
@@ -957,6 +994,36 @@ namespace CLEO
             else
             {
                 TRACE("Failed to write save file '%s'!", safe_name);
+            }
+
+            try
+            {
+                std::ofstream childFile(child_safe_name, std::ios::binary);
+                if (childFile.is_open())
+                {
+                    childFile.exceptions(std::ios::failbit | std::ios::badbit);
+
+                    ChildSaveHeader childHeader = {
+                        ChildSaveHeader::sign,
+                        ChildSaveHeader::version,
+                        childSaves.size()
+                    };
+
+                    WriteBinary(childFile, childHeader);
+                    if (!childSaves.empty())
+                        WriteBinary(childFile, childSaves.data(), childSaves.size());
+
+                    TRACE("Saved %u child custom script states to %s",
+                        childHeader.n_children, child_safe_name);
+                }
+                else
+                {
+                    TRACE("Failed to write child script save file '%s'!", child_safe_name);
+                }
+            }
+            catch (std::exception& ex)
+            {
+                TRACE("Saving child script state failed. %s", ex.what());
             }
         }
         catch (std::exception& ex)
