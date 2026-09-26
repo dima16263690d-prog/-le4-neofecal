@@ -1636,7 +1636,7 @@ namespace CLEO {
 
 		ScmFunction* scmFunc = new ScmFunction(thread);
 		
-		static SCRIPT_VAR arguments[32];
+		SCRIPT_VAR arguments[32] = {};
 		SCRIPT_VAR* locals = thread->IsMission() ? missionLocals : thread->GetVarPtr();
 		SCRIPT_VAR* localsEnd = locals + 32;
 		SCRIPT_VAR* storedLocals = scmFunc->savedTls;
@@ -2605,7 +2605,17 @@ namespace CLEO {
 			*thread >> result;
 		else
 			result = &GetScriptParamPointer(thread)->cParam;
-		sprintf(result, format, val);
+		if (!result)
+			return OR_CONTINUE;
+
+		if (!format)
+		{
+			result[0] = '\0';
+			return OR_CONTINUE;
+		}
+
+		_snprintf_s(result, 16, _TRUNCATE, format, (double)val);
+		result[15] = '\0';
 		return OR_CONTINUE;
 	}
 
