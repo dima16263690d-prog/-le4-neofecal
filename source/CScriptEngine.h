@@ -16,10 +16,12 @@ namespace CLEO
         friend struct ThreadSavingInfo;
 
         DWORD dwChecksum;
+        BYTE *ownedBuffer;
         bool bSaveEnabled;
         bool bOK;
         DWORD LastSearchPed, LastSearchCar, LastSearchObj;
         CLEO_Version CompatVer;
+        CCustomScript *parentThread;
         BYTE UseTextCommands;
         int NumDraws;
         int NumTexts;
