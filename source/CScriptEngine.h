@@ -25,7 +25,6 @@ namespace CLEO
         BYTE UseTextCommands;
         int NumDraws;
         int NumTexts;
-		CCustomScript *parentThread;
 		std::list<CCustomScript*> childThreads;
         std::list<RwTexture*> script_textures;
         std::vector<BYTE> script_draws;
