@@ -1211,6 +1211,7 @@ namespace CLEO
     void CScriptEngine::UnregisterAllScripts()
     {
         TRACE("Unregistering all custom scripts");
+        DIAG("[CLEO][CUSTOM][UNREGISTER_ALL]");
         std::for_each(CustomScripts.begin(), CustomScripts.end(), [this](CCustomScript *cs) {
             RemoveScriptFromQueue(cs, activeThreadQueue);
             cs->SetActive(false);
@@ -1220,6 +1221,7 @@ namespace CLEO
     void CScriptEngine::ReregisterAllScripts()
     {
         TRACE("Reregistering all custom scripts");
+        DIAG("[CLEO][CUSTOM][REREGISTER_ALL]");
         std::for_each(CustomScripts.begin(), CustomScripts.end(), [this](CCustomScript *cs) {
             AddScriptToQueue(cs, activeThreadQueue);
             cs->SetActive(true);
@@ -1239,6 +1241,7 @@ namespace CLEO
         NumTexts = 0;
 
         TRACE("Loading custom script %s...", szFileName);
+        DIAG("[CLEO][CUSTOM][LOAD] file=%s parent=%p label=%d", szFileName, parent, label);
 
         try
         {
