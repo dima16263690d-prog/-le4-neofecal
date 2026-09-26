@@ -1831,9 +1831,10 @@ namespace CLEO {
 		// With multiple custom streams sharing one name (parent + 0E6F children),
 		// prefer terminating the current custom thread when its name matches.
 		// The legacy fallback remains for explicitly targeting another name.
-		if (thread->IsCustom() && _stricmp(thread->GetName(), threadName) == 0)
+		CCustomScript *current_custom_thread = reinterpret_cast<CCustomScript *>(thread);
+		if (current_custom_thread->IsCustom() && _stricmp(current_custom_thread->GetName(), threadName) == 0)
 		{
-			deleted_thread = reinterpret_cast<CCustomScript *>(thread);
+			deleted_thread = current_custom_thread;
 		}
 		else
 		{
