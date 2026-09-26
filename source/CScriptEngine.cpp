@@ -1312,9 +1312,13 @@ namespace CLEO
 			lastScriptCreated = this;
             bOK = true;
             if (parent)
+            {
                 DIAG("[CLEO][CUSTOM][CREATE] name=%.*s parent=%.*s label=%d", 8, Name, 8, parent->Name, label);
+            }
             else
+            {
                 DIAG("[CLEO][CUSTOM][CREATE] name=%.*s root=1", 8, Name);
+            }
         }
         catch (std::exception& e)
         {
