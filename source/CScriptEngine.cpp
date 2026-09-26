@@ -1084,6 +1084,7 @@ namespace CLEO
                     if (!childSaves.empty())
                         WriteBinary(childFile, childSaves.data(), childSaves.size());
 
+                    DIAG("[CLEO][SAVE][CUSTOM] saved child states=%u file=%s",
                         childHeader.n_children, child_safe_name);
                 }
                 else
