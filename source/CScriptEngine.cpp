@@ -993,6 +993,8 @@ namespace CLEO
 				// thread as a CCustomScript and using an incompatible code buffer.
 				if (!parent->IsCustom())
 					throw std::logic_error("Trying to create external thread from non-custom parent thread");
+				// Child scripts inherit the parent's CLEO compatibility mode.
+				CompatVer = parent->GetCompatibility();
 				BaseIP = parent->GetBasePointer();
 				CurrentIP = parent->GetBasePointer() - label;
 				memcpy(Name, parent->Name, sizeof(Name));
