@@ -22,6 +22,8 @@ namespace CLEO
         DWORD LastSearchPed, LastSearchCar, LastSearchObj;
         CLEO_Version CompatVer;
         CCustomScript *parentThread;
+        int childLabel;
+        DWORD savedNodeId;
         BYTE UseTextCommands;
         int NumDraws;
         int NumTexts;
@@ -95,6 +97,7 @@ namespace CLEO
         void							RemoveAllCustomScripts();
         void							UnregisterAllScripts();
         void							ReregisterAllScripts();
+        void							RestorePendingChildScript(CCustomScript *parent, CCustomScript *child, int label);
         inline size_t				WorkingScriptsCount() { return CustomScripts.size(); }
         virtual void					Inject(CCodeInjector&);
 
