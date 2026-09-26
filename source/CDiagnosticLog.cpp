@@ -4,7 +4,7 @@
 CDiagnosticLog DiagnosticLog;
 
 #ifdef DEBUGIT
-CDiagnosticLog::CDiagnosticLog() : m_hFile("cleo/cleo_diagnostic.log", std::ios::out | std::ios::app)
+CDiagnosticLog::CDiagnosticLog() : m_hFile("cleo_diagnostic.log", std::ios::out | std::ios::app)
 {
     Trace("============================================================");
     Trace("[CLEO][DIAGNOSTIC] Log started");
