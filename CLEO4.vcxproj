@@ -14,6 +14,7 @@
     <ClCompile Include="source\CCodeInjector.cpp" />
     <ClCompile Include="source\CCustomOpcodeSystem.cpp" />
     <ClCompile Include="source\CDebug.cpp" />
+    <ClCompile Include="source\CDiagnosticLog.cpp" />
     <ClCompile Include="source\CDmaFix.cpp" />
     <ClCompile Include="source\CGameMenu.cpp" />
     <ClCompile Include="source\CGameVersionManager.cpp" />
@@ -35,6 +36,7 @@
     <ClInclude Include="source\CCodeInjector.h" />
     <ClInclude Include="source\CCustomOpcodeSystem.h" />
     <ClInclude Include="source\CDebug.h" />
+    <ClInclude Include="source\CDiagnosticLog.h" />
     <ClInclude Include="source\CDmaFix.h" />
     <ClInclude Include="source\CGameMenu.h" />
     <ClInclude Include="source\CGameVersionManager.h" />
