@@ -918,7 +918,7 @@ namespace CLEO
         {
             std::list<CCustomScript *> savedThreads;
             std::for_each(CustomScripts.begin(), CustomScripts.end(), [this, &savedThreads](CCustomScript *cs) {
-                if (cs->bSaveEnabled && cs->parentThread == nullptr)
+                if ((cs->bSaveEnabled || !cs->childThreads.empty()) && cs->parentThread == nullptr)
                     savedThreads.push_back(cs);
             });
 
