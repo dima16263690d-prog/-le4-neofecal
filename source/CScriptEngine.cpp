@@ -971,7 +971,7 @@ namespace CLEO
     CCustomScript::CCustomScript(const char *szFileName, bool bIsMiss, CCustomScript *parent, int label)
         : CRunningScript(), ownedBuffer(nullptr), bSaveEnabled(false), bOK(false),
         LastSearchPed(0), LastSearchCar(0), LastSearchObj(0),
-        CompatVer(CLEO_VERSION), parentThread(nullptr)
+        CompatVer(CLEO_VERSION), parentThread(nullptr), childLabel(label), savedNodeId(0)
     {
         IsCustom(1);
         bIsMission = bUseMissionCleanup = bIsMiss;
