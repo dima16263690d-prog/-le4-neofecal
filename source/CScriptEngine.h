@@ -55,6 +55,7 @@ namespace CLEO
         inline void enable_saving(bool en = true) { bSaveEnabled = en; }
         inline void SetCompatibility(CLEO_Version ver) { CompatVer = ver; }
         inline CLEO_Version GetCompatibility() { return CompatVer; }
+        inline int GetChildLabel() { return childLabel; }
         inline DWORD& GetLastSearchPed() { return LastSearchPed; }
         inline DWORD& GetLastSearchVehicle() { return LastSearchCar; }
         inline DWORD& GetLastSearchObject() { return LastSearchObj; }
