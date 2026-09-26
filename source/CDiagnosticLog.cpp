@@ -4,9 +4,7 @@
 CDiagnosticLog DiagnosticLog;
 
 #ifdef DEBUGIT
-
-CDiagnosticLog::CDiagnosticLog()
-    : m_hFile("cleo_diagnostic.log", std::ios::out | std::ios::trunc)
+CDiagnosticLog::CDiagnosticLog() : m_hFile("cleo/cleo_diagnostic.log", std::ios::out | std::ios::app)
 {
     Trace("============================================================");
     Trace("[CLEO][DIAGNOSTIC] Log started");
@@ -44,32 +42,4 @@ void CDiagnosticLog::Trace(const char *format, ...)
     OutputDebugStringA(szBuf);
     OutputDebugStringA("\n");
 }
-
-void CDiagnosticLog::Error(const char *format, ...)
-{
-    SYSTEMTIME t;
-    char szBuf[2048];
-
-    GetLocalTime(&t);
-
-    int offset = sprintf_s(
-        szBuf,
-        sizeof(szBuf),
-        "%02d/%02d/%04d %02d:%02d:%02d.%03d [CLEO][ERROR] ",
-        t.wDay, t.wMonth, t.wYear,
-        t.wHour, t.wMinute, t.wSecond, t.wMilliseconds
-    );
-
-    va_list arg;
-    va_start(arg, format);
-    vsnprintf_s(szBuf + offset, sizeof(szBuf) - offset, _TRUNCATE, format, arg);
-    va_end(arg);
-
-    m_hFile << szBuf << std::endl;
-    m_hFile.flush();
-
-    OutputDebugStringA(szBuf);
-    OutputDebugStringA("\n");
-}
-
 #endif
