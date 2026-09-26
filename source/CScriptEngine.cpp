@@ -357,13 +357,14 @@ namespace CLEO
     struct ChildSaveHeader
     {
         const static unsigned sign;
+        const static unsigned format_version;
         unsigned signature;
-        const static unsigned version;
+        unsigned version;
         unsigned n_children;
     };
 
     const unsigned ChildSaveHeader::sign = 0x31484343; // CCH1
-    const unsigned ChildSaveHeader::version = 1;
+    const unsigned ChildSaveHeader::format_version = 1;
 
     struct ChildThreadSavingInfo
     {
@@ -820,7 +821,7 @@ namespace CLEO
 
                     ChildSaveHeader header{};
                     ReadBinary(cs, header);
-                    if (header.signature != ChildSaveHeader::sign || header.version != ChildSaveHeader::version)
+                    if (header.signature != ChildSaveHeader::sign || header.version != ChildSaveHeader::format_version)
                         throw std::runtime_error("Invalid child save format");
 
                     pendingChildSaves.resize(header.n_children);
@@ -1005,7 +1006,7 @@ namespace CLEO
 
                     ChildSaveHeader childHeader = {
                         ChildSaveHeader::sign,
-                        ChildSaveHeader::version,
+                        ChildSaveHeader::format_version,
                         childSaves.size()
                     };
 
