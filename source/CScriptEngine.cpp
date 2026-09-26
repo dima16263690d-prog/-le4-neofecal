@@ -988,7 +988,12 @@ namespace CLEO
 			{
 				if (!parent)
 					throw std::logic_error("Trying to create external thread from label without parent thread");
-				BaseIP = parent->GetBasePointer();
+								// Child custom scripts may only be created from another custom script.
+				// This keeps 0E6F/CLEO_CreateCustomScript from treating a native SCM
+				// thread as a CCustomScript and using an incompatible code buffer.
+				if (!parent->IsCustom())
+					throw std::logic_error("Trying to create external thread from non-custom parent thread");
+BaseIP = parent->GetBasePointer();
 				CurrentIP = parent->GetBasePointer() - label;
 				memcpy(Name, parent->Name, sizeof(Name));
 				dwChecksum = parent->dwChecksum;
