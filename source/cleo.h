@@ -9,6 +9,7 @@
 #include "CPluginSystem.h"
 #include "CScriptEngine.h"
 #include "CCustomOpcodeSystem.h"
+#include "CDiagnosticLog.h"
 #include "CTextManager.h"
 #include "CSoundSystem.h"
 #include "FileEnumerator.h"
