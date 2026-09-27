@@ -28,6 +28,8 @@ thread "CFNCTEST"
 
 wait 2000
 
+0@ = 1
+
 // ------------------------------------------------------------
 // TEST 1: function returns TRUE, followed by TRUE => AND TRUE
 // ------------------------------------------------------------
@@ -57,6 +59,8 @@ else
 end
 
 wait 2500
+
+0@ = 0
 
 // ------------------------------------------------------------
 // TEST 3: function returns FALSE, followed by FALSE => OR FALSE
