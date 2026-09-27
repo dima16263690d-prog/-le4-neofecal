@@ -65,6 +65,46 @@ namespace CLEO
         cs->SetScmFunction(thisScmFunctionId = static_cast<unsigned short>(allocationPlace));
     }
 
+    ScmFunction::ScmFunction(RestoreTag)
+        : prevScmFunctionId(0),
+          thisScmFunctionId(static_cast<unsigned short>(allocationPlace)),
+          callArgCount(0),
+          callIP(nullptr),
+          retnAddress(nullptr),
+          savedBaseIP(nullptr),
+          savedCodeSize(0),
+          savedSP(0),
+          savedCondResult(false),
+          savedLogicalOp(eLogicalOperation::NONE),
+          savedNotFlag(false)
+    {
+        std::fill(savedStack, savedStack + 8, nullptr);
+        std::fill(savedTls, savedTls + 32, SCRIPT_VAR{});
+    }
+
+    ScmFunction *ScmFunction::CreateRestored()
+    {
+        return new ScmFunction(RestoreTag{});
+    }
+
+    void ScmFunction::ReleaseForScript(CCustomScript *thread)
+    {
+        if (!thread)
+            return;
+
+        std::set<unsigned short> visited;
+        WORD id = thread->GetScmFunction();
+
+        while (id < store_size && Store[id] && visited.insert(id).second)
+        {
+            ScmFunction *scmFunc = Store[id];
+            id = scmFunc->prevScmFunctionId;
+            delete scmFunc;
+        }
+
+        thread->SetScmFunction(0);
+    }
+
     void ScmFunction::Return(CRunningScript *thread)
     {
         auto cs = reinterpret_cast<CCustomScript*>(thread);
