@@ -1826,6 +1826,11 @@ namespace CLEO {
 		return ScmFunction::Store[id];
 	}
 
+	bool HasActiveScmFunction(CCustomScript *cs)
+	{
+		return GetActiveScmFunction(cs) != nullptr;
+	}
+
 	//0AB1=-1,cleo_call %1p%
 	OpcodeResult __stdcall opcode_0AB1(CRunningScript *thread)
 	{
