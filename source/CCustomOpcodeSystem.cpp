@@ -2711,11 +2711,11 @@ extern "C"
 		const DWORD requested = static_cast<DWORD>(count);
 		const DWORD stored = std::min<DWORD>(requested, 32);
 
-		// Fill only the native 32-entry opcodeParams buffer.
-		for (DWORD i = 0; i < stored; ++i)
-			GetScriptParams(thread, 1);
+		// Collect the representable portion in the native 32-entry buffer.
+		if (stored)
+			GetScriptParams(thread, stored);
 
-		// Still advance the script over the remaining parameters.
+		// Still advance the script over the remaining parameters, one at a time.
 		for (DWORD i = stored; i < requested; ++i)
 			GetScriptParams(thread, 1);
 	}
