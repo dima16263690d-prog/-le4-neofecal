@@ -90,6 +90,32 @@ void CDebug::TraceError(const char *format, ...)
     va_end(args);
 }
 
+void CDebug::TraceDiagnostic(const char *format, ...)
+{
+    char message[2048];
+
+    va_list args;
+    va_start(args, format);
+    FormatMessage(message, sizeof(message), format, args);
+    va_end(args);
+
+    const char *level = "INFO";
+
+    if (strstr(message, "[ERROR]") || strstr(message, "[Error]") ||
+        strstr(message, "error") || strstr(message, "Error") ||
+        strstr(message, "failed") || strstr(message, "Failed"))
+    {
+        level = "ERROR";
+    }
+    else if (strstr(message, "[WARNING]") || strstr(message, "[Warning]") ||
+             strstr(message, "warning") || strstr(message, "Warning"))
+    {
+        level = "WARNING";
+    }
+
+    Write(level, message);
+}
+
 #endif
 
 void Error(const char *szStr)
