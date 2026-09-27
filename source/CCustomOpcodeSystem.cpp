@@ -1938,11 +1938,11 @@ namespace CLEO {
 				if (returnValues[i].isString)
 				{
 					strncpy(destination, returnValues[i].stringValue.c_str(), capacity);
-					destination[capacity - 1] = '\\0';
+					destination[capacity - 1] = '\0';
 				}
 				else
 				{
-					destination[0] = '\\0';
+					destination[0] = '\0';
 				}
 
 				SkipOneScmParam(thread);
