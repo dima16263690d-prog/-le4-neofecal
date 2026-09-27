@@ -6,7 +6,6 @@
 
 namespace CLEO
 {
-    class CCustomScript;
     const size_t MAX_STR_LEN = 0xff; // max length of string type parameter
     enum OpcodeResult : char
     {
@@ -16,7 +15,6 @@ namespace CLEO
 
     typedef OpcodeResult(__stdcall * CustomOpcodeHandler)(CRunningScript*);
     void ResetScmFunctionStore();
-    bool HasActiveScmFunction(CCustomScript *cs);
     bool is_legacy_handle(DWORD dwHandle);
     FILE * convert_handle_to_file(DWORD dwHandle);
 
