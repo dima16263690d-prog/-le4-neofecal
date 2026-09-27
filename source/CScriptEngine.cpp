@@ -1154,6 +1154,10 @@ namespace CLEO
     {
         const bool wasChild = cs->parentThread != nullptr;
 
+        // A custom script may own an active 0AB1 ScmFunction chain.
+        // Release that runtime state before the script object is deleted.
+        ReleaseScmFunctionsForScript(cs);
+
         // Detach this script from its parent first so removing a child cannot
         // leave a stale pointer in the parent's child list.
         if (cs->parentThread)
