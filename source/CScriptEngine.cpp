@@ -1174,7 +1174,6 @@ namespace CLEO
         if (cs == CustomMission)
         {
             TRACE("Unregistering custom mission named %.*s", 8, cs->Name);
-            DIAG("[CLEO][CUSTOM][END] mission name=%.*s", 8, cs->Name);
             RemoveScriptFromQueue(CustomMission, activeThreadQueue);
             ScriptsWaitingForDelete.push_back(cs);
             CustomMission->SetActive(false);
@@ -1187,12 +1186,10 @@ namespace CLEO
             {
                 InactiveScriptHashes.insert(cs->dwChecksum);
                 TRACE("Stopping custom script named %.*s", 8, cs->Name);
-                DIAG("[CLEO][CUSTOM][STOP] name=%.*s parent=%p label=%d", 8, cs->Name, cs->parentThread, cs->childLabel);
             }
             else
             {
                 TRACE("Unregistering custom script named %.*s", 8, cs->Name);
-                DIAG("[CLEO][CUSTOM][END] name=%.*s parent=%p label=%d", 8, cs->Name, cs->parentThread, cs->childLabel);
                 ScriptsWaitingForDelete.push_back(cs);
             }
 
@@ -1215,7 +1212,6 @@ namespace CLEO
         for (auto cs : ScriptsWaitingForDelete)
         {
             TRACE("Deleting inactive script named %.*s", 8, cs->Name);
-            DIAG("[CLEO][CUSTOM][DELETE] name=%.*s", 8, cs->Name);
             delete cs;
         }
         ScriptsWaitingForDelete.clear();
@@ -1330,11 +1326,9 @@ memcpy(Name, parent->Name, sizeof(Name));
             bOK = true;
             if (parent)
             {
-                DIAG("[CLEO][CUSTOM][CREATE] name=%.*s parent=%.*s label=%d", 8, Name, 8, parent->Name, label);
             }
             else
             {
-                DIAG("[CLEO][CUSTOM][CREATE] name=%.*s root=1", 8, Name);
             }
         }
         catch (std::exception& e)
