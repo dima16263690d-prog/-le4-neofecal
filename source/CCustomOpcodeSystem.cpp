@@ -861,6 +861,32 @@ namespace CLEO {
 		thread->ReadDataByte();
 	}
 
+	// ========================================================================
+	// PROJECT ARCHITECTURE NOTE — 0E6F and ScmFunction
+	//
+	// 0E6F is the project's custom-stream mechanism. Do NOT replace or
+	// redesign 0E6F/CCustomScript/parentThread/childThreads with the CLEO 5
+	// architecture. The 0E6F lifecycle owns custom-script creation, buffers,
+	// parent/child links and child Save/Load state.
+	//
+	// ScmFunction is a separate execution-scope layer used by 0AB1/0AB2.
+	// It may borrow the useful scope ideas from CLEO 5, but it must remain
+	// compatible with the existing CLEO 4 CRunningScript layout and legacy
+	// .cs/.cs3/.cs4 behavior.
+	//
+	// Runtime checks completed on 27.09.2026:
+	//   - 0AB1/0AB2: 0 args -> 0 returns
+	//   - 1 arg -> 1 return (10 -> 15)
+	//   - 2 args -> 2 returns (111,222 -> 121,242; screen test)
+	//   - ConditionResult TRUE/FALSE checks through 004D jump_if_false
+	//   - nested ScmFunction A -> B -> C (777 -> 797 -> 807)
+	//   - GOSUB inside 0AB1 function (40 -> 42)
+	//   - 0E6F parent/child/nested-child Save/Load sidecar read/write
+	//
+	// Important diagnostic limitation:
+	// current [0AB2] trace prints ret count + first return value only.
+	// ret=2 121 does not by itself prove the second return value.
+	// ========================================================================
 	struct ScmFunction
 	{
 		unsigned short prevScmFunctionId, thisScmFunctionId;
