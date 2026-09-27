@@ -62,6 +62,12 @@ namespace CLEO
         if (!m_active)
             return;
 
+        TRACE("Restoring memory protection at 0x%08X (size: 0x%08X, old: 0x%08X)",
+            (DWORD)m_address,
+            (DWORD)m_size,
+            (DWORD)m_oldProtection
+        );
+
         DWORD ignored = 0;
         if (!VirtualProtect(m_address, m_size, m_oldProtection, &ignored))
             Error("VirtualProtect failed while restoring memory protection");
