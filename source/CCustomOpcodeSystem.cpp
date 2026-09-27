@@ -2874,16 +2874,6 @@ extern "C"
 		return *thread->GetBytePointer();
 	}
 
-	void WINAPI CLEO_RetrieveOpcodeParams(CRunningScript *thread, int count)
-	{
-		GetScriptParams(thread, count);
-	}
-
-	void WINAPI CLEO_RecordOpcodeParams(CRunningScript *thread, int count)
-	{
-		SetScriptParams(thread, count);
-	}
-
 	SCRIPT_VAR * WINAPI CLEO_GetPointerToScriptVariable(CRunningScript* thread)
 	{
 		return GetScriptParamPointer(thread);
