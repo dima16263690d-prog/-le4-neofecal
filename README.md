@@ -178,3 +178,55 @@ CCustomScript
 - Child streams are never written into the legacy hash-only saved-thread list.
 - Child state is stored in a separate `csN.children.sav` sidecar. The legacy `csN.sav` header and record layout remain unchanged.
 - The sidecar stores parent/child node IDs, label, sibling ordinal, locals, timers, IP offset, condition/logical state and name, allowing nested child streams to be restored when their parent recreates them.
+
+
+## Диагностический лог и проверка runtime — 27.09.2026
+
+В проект возвращён диагностический лог без отдельного DiagnosticLog-подпроекта.
+
+### Что сделано
+
+- `CDiagnosticLog.h/.cpp` снова входят непосредственно в основной проект CLEO4.
+- `source/cleo.h` подключает `CDiagnosticLog.h`.
+- `CLEO4.vcxproj` содержит `CDiagnosticLog.cpp` и `CDiagnosticLog.h`.
+- Макрос `DIAG(...)` используется для внутренних диагностических сообщений.
+- Лог создаётся в корне игры как `cleo_diagnostic.log`.
+- Лог открывается с `std::ios::trunc`, поэтому каждый запуск начинает новый файл.
+- Убраны отдельные `Error()` / `DIAG_ERROR()` из текущей реализации.
+- Диагностика custom-script lifecycle показывает `LOAD`, `CREATE`, `REGISTER`, `END`, `STOP`, `DELETE`, а также parent/child label.
+
+### Проверка custom-script lifecycle
+
+На **27.09.2026** выполнен runtime-тест на **GTA San Andreas 1.0.0.0 US**.
+
+Лог подтвердил:
+
+- обычные `.cs` из ModLoader успешно загружаются и регистрируются;
+- `0E6F` создаёт два дочерних custom-script из одного parent;
+- child с label `-170` корректно завершается через `0A93`;
+- child с label `-99` продолжает выполняться;
+- затем оставшийся child также корректно завершается;
+- при завершении игры custom scripts проходят `END` и `DELETE`;
+- несколько одновременно существующих custom scripts корректно обрабатываются;
+- имена в диагностике соответствуют внутреннему 8-байтному полю `CRunningScript::Name`; изменение отображаемого имени у некоторых ModLoader `.cs` само по себе не считается доказательством повреждения памяти.
+
+Последний тест использовал цепочку:
+
+`0E6F → 0E70 → 0D2E → 0A93`
+
+где:
+
+- `0E6F` создаёт child;
+- `0E70` получает указатель на последний созданный custom-script;
+- `0D2E` устанавливает значение локальной переменной child;
+- `0A93` завершает текущий child.
+
+### Диагностический вывод
+
+По последнему логу явного сбоя lifecycle custom-script не обнаружено. В частности, проверенный сценарий с двумя child корректно проходит создание, выполнение, завершение и удаление.
+
+Имена вроде `manuald`, `driveby`, `voidwea`, `gang_hu` являются именами загруженных `.cs`/ModLoader-скриптов, усечёнными до legacy-буфера `CRunningScript::Name[8]`. Поэтому такие строки в диагностическом логе не рассматриваются как отдельная ошибка CLEO без воспроизводимого повреждения состояния.
+
+### Следующая проверка
+
+Следующим отдельным тестом является проверка сохранения именно состояния локальной переменной child (`0@ = 111`) через полный цикл Save/Load. Это позволит подтвердить не только восстановление child по label, но и восстановление его runtime state.
