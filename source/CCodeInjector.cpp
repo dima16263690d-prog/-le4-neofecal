@@ -19,6 +19,9 @@ namespace CLEO
         auto pNtHeader = (PIMAGE_NT_HEADERS)(pImageBase + pDosHeader->e_lfanew);
         auto pSection = IMAGE_FIRST_SECTION(pNtHeader);
 
+        m_memoryProtections.clear();
+        m_memoryProtections.reserve(pNtHeader->FileHeader.NumberOfSections);
+
         for (int i = pNtHeader->FileHeader.NumberOfSections; i; i--, pSection++)
         {
             const bool isText = !strcmp((char*)pSection->Name, ".text");
@@ -39,11 +42,7 @@ namespace CLEO
             );
 
             void* address = pImageBase + pSection->VirtualAddress;
-
-            if (isText)
-                m_textProtection = CMemoryProtection(address, dwPhysSize, newProtect);
-            else
-                m_rdataProtection = CMemoryProtection(address, dwPhysSize, newProtect);
+            m_memoryProtections.emplace_back(address, dwPhysSize, newProtect);
         }
 
         bAccessOpen = true;
@@ -53,21 +52,13 @@ namespace CLEO
     {
         if (!bAccessOpen) return;
 
-        // Restore the exact protections captured by OpenReadWriteAccess().
-        // CCodeInjector normally stays alive for the lifetime of CLEO, so
-        // plugins keep write access during initialization and normal runtime.
-        if (m_textProtection.IsActive())
-        {
-            TRACE("Restoring memory protection for '.text'");
-            m_textProtection.Reset();
-        }
+        // Restore every section protection captured by OpenReadWriteAccess().
+        // Multiple .text sections can exist in the executable, so each one
+        // must keep its own RAII protection state.
+        for (auto& protection : m_memoryProtections)
+            protection.Reset();
 
-        if (m_rdataProtection.IsActive())
-        {
-            TRACE("Restoring memory protection for '.rdata'");
-            m_rdataProtection.Reset();
-        }
-
+        m_memoryProtections.clear();
         bAccessOpen = false;
     }
 }
