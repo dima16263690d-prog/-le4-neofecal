@@ -9,7 +9,6 @@ namespace CLEO
     class CScriptEngine;
     struct ScmFunction;
     struct ThreadSavingInfo;
-    struct RwTexture;
 
     class CCustomScript : public CRunningScript
     {
