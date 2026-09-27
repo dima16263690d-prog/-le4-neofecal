@@ -1,5 +1,6 @@
 #pragma once
 #include "CDebug.h"
+#include "CMemory.h"
 
 namespace CLEO
 {
@@ -71,50 +72,52 @@ namespace CLEO
 
         template<typename T> void MemoryReadOffset(memory_pointer addr, T& result, bool force_vp = false)
         {
-            DWORD oldProtect;
-            bool vp = force_vp;
-            if (vp) VirtualProtect(addr, sizeof(T), PAGE_EXECUTE_READWRITE, &oldProtect);
+            CMemoryProtection protection(addr.pointer, sizeof(T), PAGE_EXECUTE_READWRITE);
+            if (force_vp && !protection.IsActive())
+                return;
+
             result = MemReadOffsetPtr<T>(addr.address);
-            //if (vp) VirtualProtect(addr, sizeof(T), oldProtect, &oldProtect);
         }
 
         // copies object given by memory address @addr to the @result object
         template<typename T> void MemoryRead(memory_pointer addr, T& result, bool force_vp = false)
         {
-            DWORD oldProtect;
-            bool vp = force_vp;
-            if (vp) VirtualProtect(addr, sizeof(T), PAGE_EXECUTE_READWRITE, &oldProtect);
+            CMemoryProtection protection(addr.pointer, sizeof(T), PAGE_EXECUTE_READWRITE);
+            if (force_vp && !protection.IsActive())
+                return;
+
             result = MemRead<T>(addr);
-            //if (vp) VirtualProtect(addr, sizeof(T), oldProtect, &oldProtect);
         }
 
         // copies array of objects given by memory address @addr to the @result array of length @cnt
         template<typename T> void MemoryRead(memory_pointer addr, T *result, size_t n, bool force_vp = false)
         {
-            DWORD oldProtect;
-            bool vp = force_vp;
-            if (vp) VirtualProtect(addr, sizeof(T) * n, PAGE_EXECUTE_READWRITE, &oldProtect);
+            CMemoryProtection protection(addr.pointer, sizeof(T) * n, PAGE_EXECUTE_READWRITE);
+            if (force_vp && !protection.IsActive())
+                return;
+
             MemCopy(result, addr, n);
-            //if (vp) VirtualProtect(addr, sizeof(T) * n, oldProtect, &oldProtect);
         }
 
         // copies @proto object to the object given by memory address @addr
         template<typename T> void MemoryWrite(memory_pointer addr, const T& proto, bool force_vp = false, size_t n = 1)
         {
-            DWORD oldProtect;
-            if (force_vp) VirtualProtect(addr, sizeof(T) * n, PAGE_EXECUTE_READWRITE, &oldProtect);
+            CMemoryProtection protection(addr.pointer, sizeof(T) * n, PAGE_EXECUTE_READWRITE);
+            if (force_vp && !protection.IsActive())
+                return;
+
             if (n != 1) MemFill(addr, proto, n);
             else MemWrite(addr, proto);
-            //if(force_vp) VirtualProtect(addr, sizeof(T) * n, oldProtect, &oldProtect);
         }
 
         // copies array of objects @proto of length @cnt to array of objects given by memory address @addr
         template<typename T> void MemoryWrite(memory_pointer addr, const T *proto, size_t n, bool force_vp = false)
         {
-            DWORD oldProtect;
-            if (force_vp) VirtualProtect(addr, sizeof(T) * n, PAGE_EXECUTE_READWRITE, &oldProtect);
+            CMemoryProtection protection(addr.pointer, sizeof(T) * n, PAGE_EXECUTE_READWRITE);
+            if (force_vp && !protection.IsActive())
+                return;
+
             MemCopy(addr, proto, n);
-            //if(force_vp) VirtualProtect(addr, sizeof(T) * n, oldProtect, &oldProtect);
         }
     };
 
