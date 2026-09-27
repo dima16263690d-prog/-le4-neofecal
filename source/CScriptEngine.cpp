@@ -1272,7 +1272,10 @@ namespace CLEO
 				CompatVer = parent->GetCompatibility();
 				BaseIP = parent->GetBasePointer();
 				CurrentIP = parent->GetBasePointer() - label;
-				memcpy(Name, parent->Name, sizeof(Name));
+								CodeSize = parent->GetCodeSize();
+				ScriptFileDir = parent->GetScriptFileDir();
+				ScriptFileName = parent->GetScriptFileName();
+memcpy(Name, parent->Name, sizeof(Name));
 				dwChecksum = parent->dwChecksum;
 				parentThread = parent;
 				parent->childThreads.push_back(this);
@@ -1285,6 +1288,7 @@ namespace CLEO
 				std::size_t length;
 				is.seekg(0, std::ios::end);
 				length = static_cast<std::size_t>(is.tellg());
+				CodeSize = length;
 				is.seekg(0, std::ios::beg);
 
 				if (bIsMiss)
