@@ -1264,7 +1264,6 @@ namespace CLEO
             {
                 DIAG("[CLEO][ERROR][SAVE] child state save failed: %s", ex.what());
             }
-            }
 
             try
             {
