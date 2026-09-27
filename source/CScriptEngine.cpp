@@ -803,9 +803,6 @@ namespace CLEO
             saved.Apply(child);
             child->savedNodeId = saved.node_id;
 
-            DIAG("[CLEO][CUSTOM][RESTORE] parent=%.*s parent_node=%08X node=%u label=%d ordinal=%u",
-                8, parent->Name, parent->savedNodeId, saved.node_id, saved.label, saved.ordinal);
-
             RestorePendingChildTree(child);
         }
     }
