@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "cleo.h"
 #include "CCustomScript.h"
+#include "ScmFunction.h"
+#include <cstdint>
 
 namespace CLEO
 {
@@ -390,6 +392,152 @@ namespace CLEO
         }
     };
 
+    // Active 0AB1 execution scopes are stored in a separate sidecar so
+    // the legacy cs*.sav layout remains unchanged. The current script locals
+    // and IP are already covered by ThreadSavingInfo; this file persists the
+    // ScmFunction caller snapshots needed when execution reaches 0AB2 later.
+    struct SavedScmStringParam
+    {
+        DWORD oldPointer;
+        std::string value;
+    };
+
+    struct ScmFunctionSaveInfo
+    {
+        unsigned node_id;
+        unsigned depth;
+        BYTE callArgCount;
+        int32_t callOffset;
+        int32_t retnOffset;
+        int32_t savedBaseOffset;
+        uint32_t savedCodeSize;
+        int32_t savedStackOffsets[8];
+        WORD savedSP;
+        SCRIPT_VAR savedTls[32];
+        bool savedCondResult;
+        int32_t savedLogicalOp;
+        bool savedNotFlag;
+        std::string savedScriptFileDir;
+        std::string savedScriptFileName;
+        std::vector<SavedScmStringParam> stringParams;
+    };
+
+    struct ScmFunctionSaveHeader
+    {
+        const static unsigned sign;
+        const static unsigned format_version;
+        unsigned signature;
+        unsigned version;
+        unsigned n_functions;
+    };
+
+    const unsigned ScmFunctionSaveHeader::sign = 0x31465343; // CSF1
+    const unsigned ScmFunctionSaveHeader::format_version = 1;
+
+    std::vector<ScmFunctionSaveInfo> pendingScmFunctionSaves;
+
+    inline int32_t SavePointerOffset(const BYTE *ptr, const BYTE *base)
+    {
+        if (!ptr)
+            return INT32_MIN;
+
+        return static_cast<int32_t>(
+            reinterpret_cast<intptr_t>(ptr) - reinterpret_cast<intptr_t>(base)
+        );
+    }
+
+    inline BYTE *RestorePointerOffset(BYTE *base, int32_t offset)
+    {
+        return offset == INT32_MIN ? nullptr : base + offset;
+    }
+
+    void SaveStringBinary(std::ostream& stream, const std::string& value)
+    {
+        uint32_t length = static_cast<uint32_t>(value.size());
+        WriteBinary(stream, length);
+        if (length)
+            stream.write(value.data(), length);
+    }
+
+    bool LoadStringBinary(std::istream& stream, std::string& value)
+    {
+        uint32_t length = 0;
+        ReadBinary(stream, length);
+
+        // Refuse obviously corrupt/hostile lengths before allocating.
+        if (length > 16 * 1024 * 1024)
+            return false;
+
+        value.resize(length);
+        if (length)
+            stream.read(&value[0], length);
+
+        return stream.good();
+    }
+
+    void CollectScmFunctionSaves(
+        CCustomScript *cs,
+        unsigned nodeId,
+        std::vector<ScmFunctionSaveInfo>& output)
+    {
+        if (!cs || nodeId == 0)
+            return;
+
+        std::vector<ScmFunction*> chain;
+        std::set<WORD> visited;
+
+        WORD id = cs->GetScmFunction();
+        while (id < ScmFunction::store_size && ScmFunction::Store[id] && visited.insert(id).second)
+        {
+            chain.push_back(ScmFunction::Store[id]);
+            id = ScmFunction::Store[id]->prevScmFunctionId;
+        }
+
+        std::reverse(chain.begin(), chain.end());
+
+        const BYTE *base = cs->GetBasePointer();
+
+        for (size_t depth = 0; depth < chain.size(); ++depth)
+        {
+            ScmFunction *fn = chain[depth];
+
+            ScmFunctionSaveInfo saved{};
+            saved.node_id = nodeId;
+            saved.depth = static_cast<unsigned>(depth);
+            saved.callArgCount = fn->callArgCount;
+            saved.callOffset = SavePointerOffset(fn->callIP, base);
+            saved.retnOffset = SavePointerOffset(fn->retnAddress, base);
+            saved.savedBaseOffset = fn->savedBaseIP
+                ? static_cast<int32_t>(
+                    reinterpret_cast<intptr_t>(fn->savedBaseIP) -
+                    reinterpret_cast<intptr_t>(base))
+                : INT32_MIN;
+            saved.savedCodeSize = static_cast<uint32_t>(fn->savedCodeSize);
+            saved.savedSP = fn->savedSP;
+            saved.savedCondResult = fn->savedCondResult;
+            saved.savedLogicalOp = static_cast<int32_t>(fn->savedLogicalOp);
+            saved.savedNotFlag = fn->savedNotFlag;
+            saved.savedScriptFileDir = fn->savedScriptFileDir;
+            saved.savedScriptFileName = fn->savedScriptFileName;
+
+            for (size_t i = 0; i < 8; ++i)
+                saved.savedStackOffsets[i] = SavePointerOffset(fn->savedStack[i], base);
+
+            std::copy(fn->savedTls, fn->savedTls + 32, saved.savedTls);
+
+            for (const auto& stringValue : fn->stringParams)
+            {
+                SavedScmStringParam stringParam{};
+                stringParam.oldPointer = static_cast<DWORD>(
+                    reinterpret_cast<uintptr_t>(stringValue.c_str()));
+                stringParam.value = stringValue;
+                saved.stringParams.push_back(std::move(stringParam));
+            }
+
+            output.push_back(std::move(saved));
+        }
+    }
+
     SCRIPT_VAR CScriptEngine::CleoVariables[0x400];
 
     template<typename T>
@@ -590,6 +738,105 @@ namespace CLEO
         }
     }
 
+    void CScriptEngine::RestorePendingScmFunctions(CCustomScript *cs)
+    {
+        if (!cs || cs->savedNodeId == 0)
+            return;
+
+        std::vector<const ScmFunctionSaveInfo*> savedStates;
+        for (const auto& saved : pendingScmFunctionSaves)
+        {
+            if (saved.node_id == cs->savedNodeId)
+                savedStates.push_back(&saved);
+        }
+
+        if (savedStates.empty())
+            return;
+
+        std::sort(savedStates.begin(), savedStates.end(),
+            [](const ScmFunctionSaveInfo* a, const ScmFunctionSaveInfo* b) {
+                return a->depth < b->depth;
+            });
+
+        BYTE *base = cs->GetBasePointer();
+        WORD prevId = 0;
+        std::map<DWORD, DWORD> restoredStringPointers;
+        std::vector<ScmFunction*> restoredFunctions;
+
+        for (const auto* saved : savedStates)
+        {
+            ScmFunction *fn = ScmFunction::CreateRestored();
+            if (!fn)
+                throw std::bad_alloc();
+
+            fn->prevScmFunctionId = prevId;
+            fn->callArgCount = saved->callArgCount;
+            fn->callIP = RestorePointerOffset(base, saved->callOffset);
+            fn->retnAddress = RestorePointerOffset(base, saved->retnOffset);
+            fn->savedBaseIP = RestorePointerOffset(base, saved->savedBaseOffset);
+            fn->savedCodeSize = saved->savedCodeSize;
+            fn->savedSP = saved->savedSP;
+            fn->savedCondResult = saved->savedCondResult;
+            fn->savedLogicalOp = static_cast<eLogicalOperation>(saved->savedLogicalOp);
+            fn->savedNotFlag = saved->savedNotFlag;
+            fn->savedScriptFileDir = saved->savedScriptFileDir;
+            fn->savedScriptFileName = saved->savedScriptFileName;
+
+            for (size_t i = 0; i < 8; ++i)
+                fn->savedStack[i] = RestorePointerOffset(base, saved->savedStackOffsets[i]);
+
+            std::copy(saved->savedTls, saved->savedTls + 32, fn->savedTls);
+
+            for (const auto& stringParam : saved->stringParams)
+            {
+                fn->stringParams.push_back(stringParam.value);
+                auto& restored = fn->stringParams.back();
+                restoredStringPointers[stringParam.oldPointer] =
+                    static_cast<DWORD>(reinterpret_cast<uintptr_t>(restored.c_str()));
+            }
+
+            restoredFunctions.push_back(fn);
+            prevId = fn->thisScmFunctionId;
+        }
+
+        // Rebind saved/current string locals that previously pointed into
+        // std::string storage owned by the pre-save ScmFunction objects.
+        for (auto* fn : restoredFunctions)
+        {
+            for (auto& var : fn->savedTls)
+            {
+                auto it = restoredStringPointers.find(var.dwParam);
+                if (it != restoredStringPointers.end())
+                    var.dwParam = it->second;
+            }
+        }
+
+        SCRIPT_VAR *currentLocals = cs->IsMission() ? missionLocals : cs->LocalVar;
+        for (size_t i = 0; i < 32; ++i)
+        {
+            auto it = restoredStringPointers.find(currentLocals[i].dwParam);
+            if (it != restoredStringPointers.end())
+                currentLocals[i].dwParam = it->second;
+        }
+
+        cs->SetScmFunction(prevId);
+
+        pendingScmFunctionSaves.erase(
+            std::remove_if(
+                pendingScmFunctionSaves.begin(),
+                pendingScmFunctionSaves.end(),
+                [cs](const ScmFunctionSaveInfo& saved) {
+                    return saved.node_id == cs->savedNodeId;
+                }),
+            pendingScmFunctionSaves.end()
+        );
+
+        TRACE("[CLEO][LOAD][ScmFunction] restored %u active scopes for '%.8s' node=%u",
+            static_cast<unsigned>(restoredFunctions.size()),
+            cs->GetName(),
+            cs->savedNodeId);
+    }
+
     void CScriptEngine::RestorePendingChildTree(CCustomScript *parent)
     {
         if (!parent || parent->savedNodeId == 0)
@@ -646,6 +893,7 @@ namespace CLEO
             AddCustomScript(child);
             saved.Apply(child);
             child->savedNodeId = saved.node_id;
+            RestorePendingScmFunctions(child);
 
             RestorePendingChildTree(child);
         }
@@ -665,6 +913,7 @@ namespace CLEO
         stopped_info = nullptr;
         safe_header.n_saved_threads = safe_header.n_stopped_threads = 0;
         pendingChildSaves.clear();
+        pendingScmFunctionSaves.clear();
         safeInfoUsed.clear();
 
         if (load_mode)
@@ -741,6 +990,74 @@ namespace CLEO
                 pendingChildSaves.clear();
                 DIAG("[CLEO][ERROR][LOAD] child state load failed: %s", ex.what());
             }
+        }
+
+        try
+        {
+            char function_safe_name[MAX_PATH];
+            _snprintf_s(function_safe_name, sizeof(function_safe_name), _TRUNCATE,
+                "./cleo/cleo_saves/cs%d.functions.sav", nSlot);
+
+            std::ifstream fs(function_safe_name, std::ios::binary);
+            if (fs.is_open())
+            {
+                fs.exceptions(std::ios::eofbit | std::ios::badbit | std::ios::failbit);
+
+                ScmFunctionSaveHeader header{};
+                ReadBinary(fs, header);
+                if (header.signature != ScmFunctionSaveHeader::sign ||
+                    header.version != ScmFunctionSaveHeader::format_version)
+                    throw std::runtime_error("Invalid ScmFunction save format");
+
+                pendingScmFunctionSaves.reserve(header.n_functions);
+
+                for (unsigned i = 0; i < header.n_functions; ++i)
+                {
+                    ScmFunctionSaveInfo saved{};
+                    uint32_t stringCount = 0;
+
+                    ReadBinary(fs, saved.node_id);
+                    ReadBinary(fs, saved.depth);
+                    ReadBinary(fs, saved.callArgCount);
+                    ReadBinary(fs, saved.callOffset);
+                    ReadBinary(fs, saved.retnOffset);
+                    ReadBinary(fs, saved.savedBaseOffset);
+                    ReadBinary(fs, saved.savedCodeSize);
+                    ReadBinary(fs, saved.savedStackOffsets, 8);
+                    ReadBinary(fs, saved.savedSP);
+                    ReadBinary(fs, saved.savedTls, 32);
+                    ReadBinary(fs, saved.savedCondResult);
+                    ReadBinary(fs, saved.savedLogicalOp);
+                    ReadBinary(fs, saved.savedNotFlag);
+                    if (!LoadStringBinary(fs, saved.savedScriptFileDir) ||
+                        !LoadStringBinary(fs, saved.savedScriptFileName))
+                        throw std::runtime_error("Invalid ScmFunction string state");
+
+                    ReadBinary(fs, stringCount);
+                    if (stringCount > 1024)
+                        throw std::runtime_error("Invalid ScmFunction string count");
+
+                    saved.stringParams.reserve(stringCount);
+                    for (uint32_t s = 0; s < stringCount; ++s)
+                    {
+                        SavedScmStringParam param{};
+                        ReadBinary(fs, param.oldPointer);
+                        if (!LoadStringBinary(fs, param.value))
+                            throw std::runtime_error("Invalid ScmFunction string parameter");
+                        saved.stringParams.push_back(std::move(param));
+                    }
+
+                    pendingScmFunctionSaves.push_back(std::move(saved));
+                }
+
+                DIAG("[CLEO][LOAD][ScmFunction] loaded function states=%u file=%s",
+                    header.n_functions, function_safe_name);
+            }
+        }
+        catch (std::exception& ex)
+        {
+            pendingScmFunctionSaves.clear();
+            DIAG("[CLEO][ERROR][LOAD] ScmFunction state load failed: %s", ex.what());
         }
 
         char cwd[MAX_PATH];
@@ -824,6 +1141,7 @@ namespace CLEO
         }
 
         AddCustomScript(cs);
+        RestorePendingScmFunctions(cs);
         return cs;
     }
 
@@ -847,6 +1165,7 @@ namespace CLEO
                 cs->savedNodeId = 0x80000000u | (++rootIndex);
 
             std::vector<ChildThreadSavingInfo> childSaves;
+            std::vector<ScmFunctionSaveInfo> functionSaves;
             unsigned nextChildNodeId = 1;
 
             auto collectChildren = [&](auto&& self, CCustomScript *parent, unsigned parentNodeId) -> void
@@ -866,12 +1185,16 @@ namespace CLEO
                     const unsigned nodeId = nextChildNodeId++;
                     child->savedNodeId = nodeId;
                     childSaves.emplace_back(child, parentNodeId, nodeId, ordinal);
+                    CollectScmFunctionSaves(child, nodeId, functionSaves);
                     self(self, child, nodeId);
                 }
             };
 
             for (auto root : savedThreads)
+            {
+                CollectScmFunctionSaves(root, root->savedNodeId, functionSaves);
                 collectChildren(collectChildren, root, root->savedNodeId);
+            }
 
             // steam offset is different, so get it manually for now
             CGameVersionManager& gvm = GetInstance().VersionManager;
@@ -940,6 +1263,66 @@ namespace CLEO
             catch (std::exception& ex)
             {
                 DIAG("[CLEO][ERROR][SAVE] child state save failed: %s", ex.what());
+            }
+            }
+
+            try
+            {
+                std::ofstream functionFile(
+                    nSlot >= 0 ? ("./cleo/cleo_saves/cs" + std::to_string(nSlot) + ".functions.sav") : "",
+                    std::ios::binary
+                );
+
+                if (functionFile.is_open())
+                {
+                    functionFile.exceptions(std::ios::failbit | std::ios::badbit);
+
+                    ScmFunctionSaveHeader functionHeader = {
+                        ScmFunctionSaveHeader::sign,
+                        ScmFunctionSaveHeader::format_version,
+                        static_cast<unsigned>(functionSaves.size())
+                    };
+
+                    WriteBinary(functionFile, functionHeader);
+
+                    for (const auto& saved : functionSaves)
+                    {
+                        WriteBinary(functionFile, saved.node_id);
+                        WriteBinary(functionFile, saved.depth);
+                        WriteBinary(functionFile, saved.callArgCount);
+                        WriteBinary(functionFile, saved.callOffset);
+                        WriteBinary(functionFile, saved.retnOffset);
+                        WriteBinary(functionFile, saved.savedBaseOffset);
+                        WriteBinary(functionFile, saved.savedCodeSize);
+                        WriteBinary(functionFile, saved.savedStackOffsets, 8);
+                        WriteBinary(functionFile, saved.savedSP);
+                        WriteBinary(functionFile, saved.savedTls, 32);
+                        WriteBinary(functionFile, saved.savedCondResult);
+                        WriteBinary(functionFile, saved.savedLogicalOp);
+                        WriteBinary(functionFile, saved.savedNotFlag);
+                        SaveStringBinary(functionFile, saved.savedScriptFileDir);
+                        SaveStringBinary(functionFile, saved.savedScriptFileName);
+
+                        const uint32_t stringCount = static_cast<uint32_t>(saved.stringParams.size());
+                        WriteBinary(functionFile, stringCount);
+                        for (const auto& stringParam : saved.stringParams)
+                        {
+                            WriteBinary(functionFile, stringParam.oldPointer);
+                            SaveStringBinary(functionFile, stringParam.value);
+                        }
+                    }
+
+                    DIAG("[CLEO][SAVE][ScmFunction] saved function states=%u file=./cleo/cleo_saves/cs%d.functions.sav",
+                        functionHeader.n_functions, nSlot);
+                }
+                else
+                {
+                    DIAG("[CLEO][ERROR][SAVE] ScmFunction state file write failed slot=%d", nSlot);
+                }
+            }
+            catch (std::exception& ex)
+            {
+                DIAG("[CLEO][ERROR][SAVE] ScmFunction state save failed: %s", ex.what());
             }
         }
         catch (std::exception& ex)
