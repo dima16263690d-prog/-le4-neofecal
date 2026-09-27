@@ -1723,18 +1723,26 @@ namespace CLEO {
 		DWORD nRetParams;
 		*thread >> nRetParams;
 
-		// opcodeParams is limited to 32 entries by the original GTA engine.
-		// Read all destinations before restoring the caller scope, but never
-		// ask GTA to collect more than one parameter at a time.
+		// GTA's opcodeParams buffer has only 32 SCRIPT_VAR entries. More
+		// importantly, 0AB2 return operands are destinations, not values to
+		// restore through SetScriptParams(). Capture the destination pointers
+		// directly and snapshot the function's return values before Return()
+		// restores the caller scope.
 		const DWORD storedRetParams = std::min<DWORD>(nRetParams, 32);
-		SCRIPT_VAR returnParams[32] = {};
-		for (DWORD i = 0; i < storedRetParams; ++i)
+		SCRIPT_VAR returnValues[32] = {};
+		SCRIPT_VAR* returnTargets[32] = {};
+		SCRIPT_VAR* locals = thread->IsMission() ? missionLocals : thread->GetVarPtr();
+
+		if (storedRetParams)
 		{
-			GetScriptParams(thread, 1);
-			returnParams[i] = opcodeParams[0];
+			memcpy(returnValues, locals, storedRetParams * sizeof(SCRIPT_VAR));
+
+			for (DWORD i = 0; i < storedRetParams; ++i)
+				returnTargets[i] = GetScriptParamPointer(thread);
 		}
 
-		// Consume extra destinations without overflowing opcodeParams.
+		// Consume unsupported extra destinations without overflowing the
+		// native 32-entry parameter buffer.
 		for (DWORD i = storedRetParams; i < nRetParams; ++i)
 			GetScriptParams(thread, 1);
 
@@ -1742,10 +1750,12 @@ namespace CLEO {
 		scmFunc->Return(thread);
 		TRACE("[0AB2] after Return: thread=%p ip=%p", thread, thread->GetBytePointer());
 
+		// Return() has restored the caller's local-variable scope. The
+		// pointers above therefore now address the actual caller destinations.
 		for (DWORD i = 0; i < storedRetParams; ++i)
 		{
-			opcodeParams[0] = returnParams[i];
-			SetScriptParams(thread, 1);
+			if (returnTargets[i])
+				*returnTargets[i] = returnValues[i];
 		}
 
 		SkipUnusedParameters(thread);
