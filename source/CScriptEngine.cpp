@@ -1245,7 +1245,7 @@ namespace CLEO
     CCustomScript::CCustomScript(const char *szFileName, bool bIsMiss, CCustomScript *parent, int label)
         : CRunningScript(), ownedBuffer(nullptr), bSaveEnabled(false), bOK(false),
         LastSearchPed(0), LastSearchCar(0), LastSearchObj(0),
-        CompatVer(CLEO_VERSION), parentThread(nullptr), childLabel(label), savedNodeId(0)
+        CompatVer(CLEO_VERSION), CodeSize(0), parentThread(nullptr), childLabel(label), savedNodeId(0)
     {
         IsCustom(1);
         bIsMission = bUseMissionCleanup = bIsMiss;
@@ -1302,9 +1302,22 @@ namespace CLEO
 
 				const char *fname = strrchr(szFileName, '\\');
 				const char *slash = strrchr(szFileName, '/');
-				if (slash && (!fname || slash > fname)) fname = slash;
-				if (fname) ++fname;
-				else fname = szFileName;
+				const char *sep = nullptr;
+				if (slash && (!fname || slash > fname)) sep = slash;
+				else sep = fname;
+
+				if (sep)
+				{
+					ScriptFileDir.assign(szFileName, static_cast<size_t>(sep - szFileName));
+					fname = sep + 1;
+				}
+				else
+				{
+					ScriptFileDir.clear();
+					fname = szFileName;
+				}
+
+				ScriptFileName = fname;
 				memcpy(Name, fname, sizeof(Name));
 				Name[7] = '\0';
 				dwChecksum = crc32(reinterpret_cast<BYTE *>(BaseIP), length);
