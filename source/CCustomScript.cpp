@@ -14,6 +14,7 @@ namespace CLEO
     extern void(__cdecl* DrawScriptStuff)(char bBeforeFade);
     extern void(__cdecl* DrawScriptStuff_H)(char bBeforeFade);
     extern CCustomScript* lastScriptCreated;
+    extern BYTE* MissionLoaded;
     extern void RunScriptDeleteDelegate(CRunningScript* script);
 
 #define NUM_STORED_SPRITES 128
