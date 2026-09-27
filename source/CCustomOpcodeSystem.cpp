@@ -836,15 +836,15 @@ namespace CLEO {
 		bool savedNotFlag;
 		static const size_t store_size = 0x400;
 		static ScmFunction *Store[store_size];
-		static size_t allocationPlace;\t\t// contains an index of last allocated object
+		static size_t allocationPlace;		// contains an index of last allocated object
 
 		void *operator new(size_t size)
 		{
 			size_t start_search = allocationPlace;
-			while (Store[allocationPlace])\t// find first unused position in store
+			while (Store[allocationPlace])	// find first unused position in store
 			{
-				if (++allocationPlace >= store_size) allocationPlace = 0;\t\t// end of store reached
-				if (allocationPlace == start_search) throw std::bad_alloc();\t// the store is filled up
+				if (++allocationPlace >= store_size) allocationPlace = 0;		// end of store reached
+				if (allocationPlace == start_search) throw std::bad_alloc();	// the store is filled up
 			}
 			ScmFunction *obj = reinterpret_cast<ScmFunction *>(::operator new(size));
 			Store[allocationPlace] = obj;
