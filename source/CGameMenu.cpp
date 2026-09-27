@@ -114,6 +114,12 @@ namespace CLEO
 
         inj.MemoryReadOffset(gvm.TranslateMemoryAddress(MA_CALL_CTEXTURE_DRAW_BG_RECT).address + 1, CTexture__DrawInRect, true);
         //gvm.TranslateMemoryAddress(MA_CTEXTURE_DRAW_IN_RECT_FUNCTION);
-        inj.ReplaceFunction(OnDrawMenuBackground, gvm.TranslateMemoryAddress(MA_CALL_CTEXTURE_DRAW_BG_RECT));
+
+        GetInstance().HookSystem.InstallCall(
+            inj,
+            "DrawMenuBackground",
+            gvm.TranslateMemoryAddress(MA_CALL_CTEXTURE_DRAW_BG_RECT),
+            (size_t)&OnDrawMenuBackground
+        );
     }
 }
