@@ -1738,7 +1738,9 @@ namespace CLEO {
 		for (DWORD i = storedRetParams; i < nRetParams; ++i)
 			GetScriptParams(thread, 1);
 
+		TRACE("[0AB2] before Return: thread=%p scm=%u returns=%u retn=%p", thread, scmFunc->thisScmFunctionId, storedRetParams, scmFunc->retnAddress);
 		scmFunc->Return(thread);
+		TRACE("[0AB2] after Return: thread=%p ip=%p", thread, thread->GetBytePointer());
 
 		for (DWORD i = 0; i < storedRetParams; ++i)
 		{
