@@ -568,6 +568,31 @@ CreateMainWindow
 
 Crash/access violation в проверенном сценарии не зафиксирован.
 
+### PointerHook — runtime-проверка (28.09.2026)
+
+Добавлен и проверен отдельный тип pointer/data hook для `MA_DEF_WINDOW_PROC_PTR`.
+
+Логика сохраняет двойную косвенность существующего патча:
+
+- HookSystem сохраняет исходное 32-битное значение слота `MA_DEF_WINDOW_PROC_PTR`.
+- После установки pointer hook исходное значение используется для второго чтения и получения реального адреса `DefWindowProc`.
+- `CSoundSystem::imp_DefWindowProc` получает настоящий исходный адрес, как в старой реализации.
+- При этом запись и восстановление самого pointer-слота выполняет `CHookSystem`.
+
+Runtime-проверка на **GTA San Andreas 1.0 US** подтверждена:
+
+```text
+[HookSystem] Installed POINTER 'DefWindowProc' at 0x00748454 -> replacement original=0x008582A4
+Creating main window...
+SoundSystem initialized
+[0A92] Starting new custom script WEAPONWHEELUI.CS
+[0AB1] ...
+[0AB2] ...
+...
+Log finished.
+```
+
+После исправления двойной косвенности приложение запускается штатно. В проверенном сценарии продолжают работать SoundSystem, обычные CLEO/ModLoader `.cs`, `0A92`, `0AB1/0AB2`, завершение scripts и восстановление memory protection.
 ### Что пока не переводилось
 
 - pointer patch `MA_DEF_WINDOW_PROC_PTR`;
