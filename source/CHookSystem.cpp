@@ -126,6 +126,54 @@ namespace CLEO
         );
     }
 
+    bool CHookSystem::InstallPointer(
+        CCodeInjector& injector,
+        const char* name,
+        memory_pointer address,
+        size_t replacement,
+        size_t* originalValue
+    )
+    {
+        const size_t patchAddress = static_cast<size_t>(address);
+
+        if (patchAddress == 0 || replacement == 0)
+        {
+            Error("CHookSystem: invalid pointer hook address or replacement");
+            return false;
+        }
+
+        if (Find(patchAddress) != nullptr)
+        {
+            Error("CHookSystem: hook already installed at requested address");
+            return false;
+        }
+
+        HookRecord record;
+        record.type = HOOK_POINTER;
+        record.address = patchAddress;
+        record.replacement = replacement;
+        record.originalValue = MemRead<DWORD>(patchAddress);
+        record.name = name ? name : "";
+
+        if (originalValue != nullptr)
+            *originalValue = record.originalValue;
+
+        injector.OpenReadWriteAccess();
+        MemWrite<DWORD>(patchAddress, (DWORD)replacement);
+
+        m_hooks.push_back(record);
+
+        TRACE(
+            "[HookSystem] Installed POINTER '%s' at 0x%08X -> 0x%08X original=0x%08X",
+            record.name.c_str(),
+            (DWORD)record.address,
+            (DWORD)record.replacement,
+            (DWORD)record.originalValue
+        );
+
+        return true;
+    }
+
     bool CHookSystem::Remove(CCodeInjector& injector, memory_pointer address)
     {
         const size_t patchAddress = static_cast<size_t>(address);
@@ -144,15 +192,27 @@ namespace CLEO
 
         injector.OpenReadWriteAccess();
 
-        memcpy(
-            reinterpret_cast<void*>(patchAddress),
-            it->originalBytes,
-            sizeof(it->originalBytes)
-        );
+        if (it->type == HOOK_POINTER)
+        {
+            MemWrite<DWORD>(patchAddress, (DWORD)it->originalValue);
+        }
+        else
+        {
+            memcpy(
+                reinterpret_cast<void*>(patchAddress),
+                it->originalBytes,
+                sizeof(it->originalBytes)
+            );
+        }
+
+        const char* typeName =
+            it->type == HOOK_CALL ? "CALL" :
+            it->type == HOOK_JUMP ? "JUMP" :
+            "POINTER";
 
         TRACE(
             "[HookSystem] Removed %s '%s' at 0x%08X",
-            it->type == HOOK_CALL ? "CALL" : "JUMP",
+            typeName,
             it->name.c_str(),
             (DWORD)patchAddress
         );
