@@ -893,6 +893,7 @@ namespace CLEO {
 		BYTE callArgCount;
 		BYTE *callIP;
 		BYTE *retnAddress;
+		CCustomScript *ownerThread;
 		void *savedBaseIP;
 		size_t savedCodeSize;
 		BYTE *savedStack[8];
