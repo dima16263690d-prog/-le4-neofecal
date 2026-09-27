@@ -515,7 +515,12 @@ namespace CLEO
         else
         {
             inj.ReplaceFunction(OnInitScm1, gvm.TranslateMemoryAddress(MA_CALL_INIT_SCM1));
-            inj.ReplaceFunction(OnInitScm2, gvm.TranslateMemoryAddress(MA_CALL_INIT_SCM2));
+            GetInstance().HookSystem.InstallCall(
+                inj,
+                "OnInitScm2",
+                gvm.TranslateMemoryAddress(MA_CALL_INIT_SCM2),
+                (size_t)OnInitScm2
+            );
             inj.ReplaceFunction(OnInitScm3, gvm.TranslateMemoryAddress(MA_CALL_INIT_SCM3));
         }
 
