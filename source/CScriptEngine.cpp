@@ -509,19 +509,34 @@ namespace CLEO
 
         if (gvm.GetGameVersion() == GV_EU11)
         {
-            inj.ReplaceFunction(OnInitScm3, gvm.TranslateMemoryAddress(MA_CALL_INIT_SCM3));
+            GetInstance().HookSystem.InstallCall(
+                inj,
+                "OnInitScm3",
+                gvm.TranslateMemoryAddress(MA_CALL_INIT_SCM3),
+                (size_t)OnInitScm3
+            );
             inj.InjectFunction(OnNewGame, 0x5DEEA0);	// GV_EU11 specific
         }
         else
         {
-            inj.ReplaceFunction(OnInitScm1, gvm.TranslateMemoryAddress(MA_CALL_INIT_SCM1));
+            GetInstance().HookSystem.InstallCall(
+                inj,
+                "OnInitScm1",
+                gvm.TranslateMemoryAddress(MA_CALL_INIT_SCM1),
+                (size_t)OnInitScm1
+            );
             GetInstance().HookSystem.InstallCall(
                 inj,
                 "OnInitScm2",
                 gvm.TranslateMemoryAddress(MA_CALL_INIT_SCM2),
                 (size_t)OnInitScm2
             );
-            inj.ReplaceFunction(OnInitScm3, gvm.TranslateMemoryAddress(MA_CALL_INIT_SCM3));
+            GetInstance().HookSystem.InstallCall(
+                inj,
+                "OnInitScm3",
+                gvm.TranslateMemoryAddress(MA_CALL_INIT_SCM3),
+                (size_t)OnInitScm3
+            );
         }
 
         inj.ReplaceFunction(OnLoadScmData, gvm.TranslateMemoryAddress(MA_CALL_LOAD_SCM_DATA));
