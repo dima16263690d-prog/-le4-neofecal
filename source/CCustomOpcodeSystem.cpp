@@ -3,6 +3,7 @@
 #include "CLegacy.h"
 #include "CGameVersionManager.h"
 #include "CCustomOpcodeSystem.h"
+#include "ScmFunction.h"
 #include "CTextManager.h"
 #include "CModelInfo.h"
 
