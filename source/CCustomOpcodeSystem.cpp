@@ -1723,18 +1723,22 @@ namespace CLEO {
 		DWORD nRetParams;
 		*thread >> nRetParams;
 
-		// 0AB2 return operands are destinations. The original GTA parameter
-		// collector has only 32 SCRIPT_VAR slots, so never collect the whole
-		// return list through GetScriptParams(). Snapshot the callee scope first,
-		// then decode/write each destination one at a time after Return().
+		// 0AB2 has two parameter lists:
+		//   1. return operands in the callee (which values to return);
+		//   2. return destinations in the caller (where to store them).
+		// GTA SA exposes only 32 SCRIPT_VAR entries in opcodeParams, so keep
+		// the native parameter semantics but never ask the game to collect
+		// more than 32 values in one call.
 		const DWORD storedRetParams = std::min<DWORD>(nRetParams, 32);
 		SCRIPT_VAR returnValues[32] = {};
-		SCRIPT_VAR* locals = thread->IsMission() ? missionLocals : thread->GetVarPtr();
 
 		if (storedRetParams)
-			memcpy(returnValues, locals, storedRetParams * sizeof(SCRIPT_VAR));
+		{
+			GetScriptParams(thread, storedRetParams);
+			memcpy(returnValues, opcodeParams, storedRetParams * sizeof(SCRIPT_VAR));
+		}
 
-		// The extra operands still have to be consumed, but one at a time.
+		// Consume any return operands above the native 32-entry limit one by one.
 		for (DWORD i = storedRetParams; i < nRetParams; ++i)
 			GetScriptParams(thread, 1);
 
@@ -1742,35 +1746,17 @@ namespace CLEO {
 		scmFunc->Return(thread);
 		TRACE("[0AB2] after Return: thread=%p ip=%p", thread, thread->GetBytePointer());
 
-		// Return() moved IP to the caller's return slots. Decode each slot
-		// separately so the native 32-entry opcodeParams buffer is never
-		// exceeded.
+		// Return() moved IP to the caller's return destinations. Use the native
+		// SetScriptParams one destination at a time so globals, locals, arrays
+		// and string destinations keep GTA SA's original semantics.
 		for (DWORD i = 0; i < storedRetParams; ++i)
 		{
-			BYTE paramType = *thread->GetBytePointer();
-			SCRIPT_VAR* target = GetScriptParamPointer(thread);
-
-			if (!target)
-				continue;
-
-			// String destinations contain a pointer to the caller's character
-			// buffer. Numeric destinations point at the caller's SCRIPT_VAR.
-			if (paramType == DT_VAR_STRING || paramType == DT_LVAR_STRING ||
-				paramType == DT_VAR_STRING_ARRAY || paramType == DT_LVAR_STRING_ARRAY)
-			{
-				if (target->pParam && returnValues[i].pcParam)
-				{
-					strncpy(reinterpret_cast<char*>(target->pParam),
-						returnValues[i].pcParam, MAX_STR_LEN - 1);
-					reinterpret_cast<char*>(target->pParam)[MAX_STR_LEN - 1] = '\0';
-				}
-			}
-			else
-			{
-				*target = returnValues[i];
-			}
+			opcodeParams[0] = returnValues[i];
+			SetScriptParams(thread, 1);
 		}
 
+		// The dynamic parameter terminator and any remaining operands belong to
+		// the caller-side 0AB1 instruction.
 		SkipUnusedParameters(thread);
 		delete scmFunc;
 		return OR_CONTINUE;
