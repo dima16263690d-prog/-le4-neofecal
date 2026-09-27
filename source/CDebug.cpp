@@ -62,10 +62,6 @@ namespace
         }
     }
 
-    bool IsSameMessage(const std::string &lastMessage, const char *level, const char *message)
-    {
-        return lastMessage == (std::string(level) + "|" + message);
-    }
 }
 
 CDebug::CDebug()
@@ -89,13 +85,15 @@ void CDebug::Write(const char *level, const char *message)
 
     std::lock_guard<std::mutex> lock(m_mutex);
 
-    // Suppress only an immediate duplicate. The same message is allowed again
-    // after another event, so a recurring real error is never hidden for the
-    // entire game session.
-    if (IsSameMessage(m_lastMessage, level, normalized))
-        return;
-
-    m_lastMessage = key;
+    // Normal informational messages are deduplicated for the whole game
+    // session. This prevents high-frequency successful operations such as
+    // repeated 0AB1/0AB2 calls from flooding the log.
+    // Warnings and errors are never suppressed here.
+    if (_stricmp(level, "Info") == 0)
+    {
+        if (!m_infoMessages.insert(key).second)
+            return;
+    }
 
     if (!m_hFile.is_open())
     {
