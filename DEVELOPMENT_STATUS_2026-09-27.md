@@ -144,3 +144,43 @@ modloader.asi
 ## Runtime evidence
 
 Последний диагностический тест от 27.09.2026 показывает, что `.cs` из ModLoader загружаются и проходят lifecycle до `END/DELETE`. Это следует использовать как контрольную точку перед дальнейшими изменениями ядра.
+
+
+---
+
+## Дополнение по сессии 27.09.2026 — ScmFunction / 0AB1 / 0AB2
+
+### Что было сделано до этой сессии
+
+- Сохранена база CLEO 4.4.4 с ориентацией на совместимость старых `.cs/.cs3/.cs4` и Sanny Builder.
+- Проверен lifecycle custom scripts на GTA SA 1.0.0.0 US.
+- Исправлена и проверена система дочерних custom scripts через 0E6F.
+- Реализована связь parent -> child -> nested child без замены старого ядра custom scripts.
+- Добавлено сохранение дерева детей в `csN.children.sav` при сохранении корневого состояния в `csN.sav`.
+- Подтверждено восстановление вложенного дерева после Load.
+- Начата работа над `ScmFunction` для `0AB1/0AB2`: сохранение locals, condition state, logical state и GOSUB stack.
+- Подтверждено, что обычный `jump` и переходы между labels работают отдельно от проблематики 0AB1/0AB2.
+
+### Что сделано сегодня
+
+- Изучена реализация функции в CLEO 5 для определения полного execution-scope, который должен сохраняться при `0AB1`.
+- В `CCustomScript` добавлены `CodeSize`, `ScriptFileDir`, `ScriptFileName` и getter/setter для этих данных.
+- При загрузке root custom script `CodeSize` сохраняет размер загруженного code buffer.
+- Child custom scripts наследуют `CodeSize`, `ScriptFileDir` и `ScriptFileName` родителя.
+- `ScmFunction` расширен до полного snapshot/restore: `BaseIP`, `CodeSize`, `Stack[8]`, `SP`, `LocalVar[32]`, `Condition`, `LogicalOperation`, `NotFlag`, `ScriptFileDir`, `ScriptFileName`, `ReturnIP`.
+- `0AB2` получил CLEO 5-style проверку количества varargs, но фактическая запись результата оставлена через существующий GTA SA/CLEO 4 `SetScriptParams()`.
+- Добавлена точечная диагностика `0AB1/0AB2`: `ENTER`, `READY`, `JUMP`, `RETURN`, `AFTER_RETURN`.
+- Создан отдельный минимальный тест `tests/SCM_FUNCTION_TEST.cs`, который ожидает `RESULT=30`.
+- Тест намеренно не использует `0E6F`, child streams или `csN.children.sav`, чтобы функция тестировалась отдельно.
+
+### Текущая контрольная точка
+
+Нужно собрать текущую версию `Release / GTASA Win32` и проверить `tests/SCM_FUNCTION_TEST.cs`.
+
+Ожидаемый runtime:
+1. `0AB1` создаёт функцию и переходит на `@ADD_VALUES`.
+2. `005A` получает `10 + 20`.
+3. `0AB2` возвращает `30`.
+4. вызывающий код показывает `RESULT=30`.
+
+При отсутствии результата следующим источником диагностики является `cleo_diagnostic.log` с новой последовательностью `0AB1/0AB2`.
