@@ -772,7 +772,8 @@ namespace CLEO
 
         BYTE *base = cs->GetBasePointer();
         WORD prevId = 0;
-        std::map<DWORD, DWORD> restoredStringPointers;
+        std::vector<DWORD> restoredStringOldPointers;
+        std::vector<DWORD> restoredStringNewPointers;
         std::vector<ScmFunction*> restoredFunctions;
 
         for (const auto* saved : savedStates)
@@ -803,8 +804,10 @@ namespace CLEO
             {
                 fn->stringParams.push_back(stringParam.value);
                 auto& restored = fn->stringParams.back();
-                restoredStringPointers[stringParam.oldPointer] =
-                    static_cast<DWORD>(reinterpret_cast<uintptr_t>(restored.c_str()));
+                restoredStringOldPointers.push_back(stringParam.oldPointer);
+                restoredStringNewPointers.push_back(
+                    static_cast<DWORD>(reinterpret_cast<uintptr_t>(restored.c_str()))
+                );
             }
 
             restoredFunctions.push_back(fn);
@@ -813,23 +816,29 @@ namespace CLEO
 
         // Rebind saved/current string locals that previously pointed into
         // std::string storage owned by the pre-save ScmFunction objects.
+        auto restoreStringPointer = [&](SCRIPT_VAR& var)
+        {
+            for (size_t i = 0; i < restoredStringOldPointers.size(); ++i)
+            {
+                if (var.dwParam == restoredStringOldPointers[i])
+                {
+                    var.dwParam = restoredStringNewPointers[i];
+                    break;
+                }
+            }
+        };
+
+        // Rebind saved/current string locals that previously pointed into
+        // std::string storage owned by the pre-save ScmFunction objects.
         for (auto* fn : restoredFunctions)
         {
             for (auto& var : fn->savedTls)
-            {
-                auto it = restoredStringPointers.find(var.dwParam);
-                if (it != restoredStringPointers.end())
-                    var.dwParam = it->second;
-            }
+                restoreStringPointer(var);
         }
 
         SCRIPT_VAR *currentLocals = cs->IsMission() ? missionLocals : cs->LocalVar;
         for (size_t i = 0; i < 32; ++i)
-        {
-            auto it = restoredStringPointers.find(currentLocals[i].dwParam);
-            if (it != restoredStringPointers.end())
-                currentLocals[i].dwParam = it->second;
-        }
+            restoreStringPointer(currentLocals[i]);
 
         cs->SetScmFunction(prevId);
 
