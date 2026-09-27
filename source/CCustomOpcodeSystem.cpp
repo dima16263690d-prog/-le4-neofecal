@@ -1881,13 +1881,7 @@ namespace CLEO {
 		if (actualReturnArgs > nRetParams)
 			SkipUnusedParameters(thread);
 
-		TRACE("[0AB2] before Return: name=%.*s thread=%p scm=%u returns=%u retn=%p",
-			8, thread->GetName(), thread, scmFunc->thisScmFunctionId, nRetParams, scmFunc->retnAddress);
-
 		scmFunc->Return(thread);
-
-		TRACE("[0AB2] after Return: name=%.*s thread=%p ip=%p",
-			8, thread->GetName(), thread, thread->GetBytePointer());
 
 		const DWORD returnSlotCount = CountScmVarArgs(thread);
 		const DWORD writeCount = std::min(nRetParams, returnSlotCount);
