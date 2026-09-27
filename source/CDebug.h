@@ -3,6 +3,7 @@
 #include <cstdarg>
 #include <fstream>
 #include <mutex>
+#include <set>
 #include <string>
 
 #define TRACE __noop
@@ -19,7 +20,7 @@ class CDebug
 #ifdef DEBUGIT
     std::ofstream m_hFile;
     std::mutex m_mutex;
-    std::string m_lastMessage;
+    std::set<std::string> m_infoMessages;
 
     void Write(const char *level, const char *message);
     void WriteFormatted(const char *level, const char *format, va_list args);
