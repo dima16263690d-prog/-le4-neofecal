@@ -1761,7 +1761,7 @@ namespace CLEO {
 		return ScmFunction::Store[id];
 	}
 
-	//0AB1=-1,call_scm_func %1p%
+	//0AB1=-1,cleo_call %1p%
 	OpcodeResult __stdcall opcode_0AB1(CRunningScript *thread)
 	{
 		int label;
@@ -1769,8 +1769,7 @@ namespace CLEO {
 
 		*thread >> label >> nParams;
 		auto debugCs = reinterpret_cast<CCustomScript *>(thread);
-		TRACE("[0AB1] ENTER thread=%p name=%s file=%s label=%d nParams=%u ip=%p",
-			thread, thread->GetName(), debugCs->GetScriptFileName().c_str(), label, nParams, thread->GetBytePointer());
+		
 
 		if (nParams > 32)
 		{
@@ -1838,8 +1837,9 @@ namespace CLEO {
 		// stream itself is unchanged: BaseIP, parentThread, childThreads and
 		// save metadata remain owned by CCustomScript/CScriptEngine.
 		scmFunc->retnAddress = thread->GetBytePointer();
-		TRACE("[0AB1] READY func=%u retn=%p firstArg=%d secondArg=%d", scmFunc->thisScmFunctionId,
-			scmFunc->retnAddress, nParams > 0 ? arguments[0].nParam : 0, nParams > 1 ? arguments[1].nParam : 0);
+		TRACE("[0AB1] %s/%s args=%u first=%d second=%d",
+			thread->GetName(), debugCs->GetScriptFileName().c_str(), nParams,
+			nParams > 0 ? arguments[0].nParam : 0, nParams > 1 ? arguments[1].nParam : 0);
 
 		memcpy(locals, arguments, nParams * sizeof(SCRIPT_VAR));
 
@@ -1851,16 +1851,16 @@ namespace CLEO {
 		}
 
 		ThreadJump(thread, label);
-		TRACE("[0AB1] JUMP func=%u newIP=%p", scmFunc->thisScmFunctionId, thread->GetBytePointer());
+		
 		return OR_CONTINUE;
 	}
 
-	//0AB2=-1,ret
+	//0AB2=-1,cleo_return
 	OpcodeResult __stdcall opcode_0AB2(CRunningScript *thread)
 	{
 		auto cs = reinterpret_cast<CCustomScript *>(thread);
 		ScmFunction *scmFunc = GetActiveScmFunction(cs);
-		TRACE("[0AB2] ENTER thread=%p func=%u ip=%p", thread, cs->GetScmFunction(), thread->GetBytePointer());
+		
 
 		if (!scmFunc)
 		{
@@ -1901,11 +1901,13 @@ namespace CLEO {
 			memcpy(returnValues, opcodeParams, nRetParams * sizeof(SCRIPT_VAR));
 		}
 
-		TRACE("[0AB2] RETURN value0=%d retn=%p", nRetParams ? returnValues[0].nParam : 0, scmFunc->retnAddress);
+		TRACE("[0AB2] %s/%s ret=%u value0=%d",
+			thread->GetName(), cs->GetScriptFileName().c_str(), nRetParams,
+			nRetParams ? returnValues[0].nParam : 0);
 
 		// Restore caller scope and jump to its return-slot list.
 		scmFunc->Return(thread);
-		TRACE("[0AB2] AFTER_RETURN ip=%p", thread->GetBytePointer());
+		
 		delete scmFunc;
 
 		// Write results through the game's own parameter writer.
