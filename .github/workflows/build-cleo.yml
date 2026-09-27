@@ -3,7 +3,12 @@ name: Build CLEO ASI
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - "builds/**"
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -36,7 +41,26 @@ jobs:
           }
           Get-Item $file | Format-List FullName,Length,LastWriteTime
 
-      - name: Upload CLEO.asi
+      - name: Publish CLEO.asi into repository
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path "builds" | Out-Null
+          Copy-Item "output\Release\CLEO.asi" "builds\CLEO.asi" -Force
+
+      - name: Commit built CLEO.asi
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add builds/CLEO.asi
+          if git diff --cached --quiet; then
+            echo "CLEO.asi unchanged"
+            exit 0
+          fi
+          git commit -m "Build Release CLEO.asi"
+          git push
+
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: CLEO-ASI-Release-GTASA-Win32
