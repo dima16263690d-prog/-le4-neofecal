@@ -184,3 +184,21 @@ modloader.asi
 4. вызывающий код показывает `RESULT=30`.
 
 При отсутствии результата следующим источником диагностики является `cleo_diagnostic.log` с новой последовательностью `0AB1/0AB2`.
+
+
+## 27.09.2026 — minimal 0AB1/0AB2 regression test tightened
+
+The test in `tests/SCM_FUNCTION_TEST.cs` was simplified to isolate the legacy CLEO 4 function path.
+
+The test now:
+- uses `thread "FTEST444"` so the runtime log can identify it;
+- does not use `{$USE CLEO+}`;
+- initializes caller locals `0@=12345` and `1@=67890`;
+- calls `0AB1` with exactly two numeric arguments: `10` and `20`;
+- returns one value through `0AB2`;
+- verifies both the returned value and restoration of the caller locals.
+
+Expected HUD result:
+`RESULT=30 C0=12345 C1=67890`
+
+This is deliberately a regression test for the existing CLEO 4-style `0AB1/0AB2` implementation and the extended `ScmFunction` scope snapshot. No child-script or save/load functionality is involved.
