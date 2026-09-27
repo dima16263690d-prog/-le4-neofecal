@@ -84,7 +84,9 @@ namespace CLEO
         // copies object given by memory address @addr to the @result object
         template<typename T> void MemoryRead(memory_pointer addr, T& result, bool force_vp = false)
         {
-            CMemoryProtection protection(addr.pointer, sizeof(T), PAGE_EXECUTE_READWRITE);
+            CMemoryProtection protection;
+            if (force_vp)
+                protection = CMemoryProtection(addr.pointer, sizeof(T), PAGE_EXECUTE_READWRITE);
             if (force_vp && !protection.IsActive())
                 return;
 
@@ -106,7 +108,9 @@ namespace CLEO
         // copies @proto object to the object given by memory address @addr
         template<typename T> void MemoryWrite(memory_pointer addr, const T& proto, bool force_vp = false, size_t n = 1)
         {
-            CMemoryProtection protection(addr.pointer, sizeof(T) * n, PAGE_EXECUTE_READWRITE);
+            CMemoryProtection protection;
+            if (force_vp)
+                protection = CMemoryProtection(addr.pointer, sizeof(T) * n, PAGE_EXECUTE_READWRITE);
             if (force_vp && !protection.IsActive())
                 return;
 
@@ -117,7 +121,9 @@ namespace CLEO
         // copies array of objects @proto of length @cnt to array of objects given by memory address @addr
         template<typename T> void MemoryWrite(memory_pointer addr, const T *proto, size_t n, bool force_vp = false)
         {
-            CMemoryProtection protection(addr.pointer, sizeof(T) * n, PAGE_EXECUTE_READWRITE);
+            CMemoryProtection protection;
+            if (force_vp)
+                protection = CMemoryProtection(addr.pointer, sizeof(T) * n, PAGE_EXECUTE_READWRITE);
             if (force_vp && !protection.IsActive())
                 return;
 
