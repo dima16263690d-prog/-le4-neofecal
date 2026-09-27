@@ -20,39 +20,51 @@ namespace
             const char *to;
         };
 
+        // All substitutions below intentionally have identical byte length.
+        // This keeps normalization in-place and prevents buffer growth.
         static const Tag tags[] =
         {
-            { "[CLEO]", "[Cleo]" },
-            { "[ERROR]", "[Error]" },
-            { "[WARNING]", "[Warning]" },
-            { "[INFO]", "[Info]" },
-            { "[CUSTOM]", "[Custom]" },
-            { "[RESTORE]", "[Restore]" },
-            { "[LOAD]", "[Load]" },
-            { "[SAVE]", "[Save]" },
-            { "[END]", "[End]" },
-            { "[STOP]", "[Stop]" },
-            { "[DELETE]", "[Delete]" },
-            { "[CREATE]", "[Create]" },
+            { "[CLEO]",     "[Cleo]"     },
+            { "[ERROR]",    "[Error]"    },
+            { "[WARNING]",  "[Warning]"  },
+            { "[INFO]",     "[Info]"     },
+            { "[CUSTOM]",   "[Custom]"   },
+            { "[RESTORE]",  "[Restore]"  },
+            { "[LOAD]",     "[Load]"     },
+            { "[SAVE]",     "[Save]"     },
+            { "[END]",      "[End]"      },
+            { "[STOP]",     "[Stop]"     },
+            { "[DELETE]",   "[Delete]"   },
+            { "[CREATE]",   "[Create]"   },
             { "[REGISTER]", "[Register]" }
         };
 
-        for (const auto &tag : tags)
+        for (char *p = message; *p; ++p)
         {
-            char *pos = nullptr;
-            while ((pos = strstr(message, tag.from)) != nullptr)
+            if (*p != '[')
+                continue;
+
+            for (const auto &tag : tags)
             {
                 const size_t fromLen = strlen(tag.from);
                 const size_t toLen = strlen(tag.to);
 
-                if (toLen <= fromLen)
-                {
-                    memcpy(pos, tag.to, toLen);
-                    if (toLen < fromLen)
-                        memmove(pos + toLen, pos + fromLen, strlen(pos + fromLen) + 1);
-                }
+                if (fromLen != toLen)
+                    continue;
+
+                if (_strnicmp(p, tag.from, fromLen) != 0)
+                    continue;
+
+                memcpy(p, tag.to, toLen);
+                p += toLen - 1;
+                break;
             }
         }
+    }
+
+    bool IsSameMessage(const std::string &lastMessage, const char *level, const char *message)
+    {
+        return lastMessage == (std::string(level) + "|" + message);
     }
 }
 
@@ -69,28 +81,40 @@ CDebug::~CDebug()
 
 void CDebug::Write(const char *level, const char *message)
 {
-    const std::string key = std::string(level) + "|" + message;
-
-    // Write each identical diagnostic only once per game session.
-    if (!m_writtenMessages.insert(key).second)
-        return;
-
     char normalized[2048];
-    strncpy_s(normalized, sizeof(normalized), message, _TRUNCATE);
+    strncpy_s(normalized, sizeof(normalized), message ? message : "", _TRUNCATE);
     NormalizeLogText(normalized);
 
+    const std::string key = std::string(level) + "|" + normalized;
+
+    std::lock_guard<std::mutex> lock(m_mutex);
+
+    // Suppress only an immediate duplicate. The same message is allowed again
+    // after another event, so a recurring real error is never hidden for the
+    // entire game session.
+    if (IsSameMessage(m_lastMessage, level, normalized))
+        return;
+
+    m_lastMessage = key;
+
+    if (!m_hFile.is_open())
+    {
+        OutputDebugStringA("[Cleo][Error] Failed to open cleo.log\n");
+        return;
+    }
+
     SYSTEMTIME t;
-    char szBuf[2048];
+    char szBuf[4096];
 
     GetLocalTime(&t);
 
     sprintf_s(
         szBuf,
         sizeof(szBuf),
-        "%02d/%02d/%04d %02d:%02d:%02d.%03d [%-7s] %s",
-        t.wDay,
-        t.wMonth,
+        "%04d-%02d-%02d %02d:%02d:%02d.%03d [%-7.7s] %s",
         t.wYear,
+        t.wMonth,
+        t.wDay,
         t.wHour,
         t.wMinute,
         t.wSecond,
