@@ -2,6 +2,7 @@
 #define __CLEO_H
 
 #include "CCodeInjector.h"
+#include "CHookSystem.h"
 #include "CGameVersionManager.h"
 #include "CDebug.h"
 #include "CDmaFix.h"
@@ -43,7 +44,12 @@ namespace CLEO
             GameMenu.Inject(CodeInjector);
             DmaFix.Inject(CodeInjector);
             UpdateGameLogics = VersionManager.TranslateMemoryAddress(MA_UPDATE_GAME_LOGICS_FUNCTION);
-            CodeInjector.ReplaceFunction(&OnUpdateGameLogics, VersionManager.TranslateMemoryAddress(MA_CALL_UPDATE_GAME_LOGICS));
+            HookSystem.InstallCall(
+                CodeInjector,
+                "UpdateGameLogics",
+                VersionManager.TranslateMemoryAddress(MA_CALL_UPDATE_GAME_LOGICS),
+                (size_t)&OnUpdateGameLogics
+            );
             TextManager.Inject(CodeInjector);
             SoundSystem.Inject(CodeInjector);
             OpcodeSystem.Inject(CodeInjector);
