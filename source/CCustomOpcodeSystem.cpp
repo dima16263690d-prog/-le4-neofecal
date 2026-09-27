@@ -1768,7 +1768,9 @@ namespace CLEO {
 		DWORD nParams;
 
 		*thread >> label >> nParams;
-		TRACE("[0AB1] ENTER thread=%p label=%d nParams=%u ip=%p", thread, label, nParams, thread->GetBytePointer());
+		auto debugCs = reinterpret_cast<CCustomScript *>(thread);
+		TRACE("[0AB1] ENTER thread=%p name=%s file=%s label=%d nParams=%u ip=%p",
+			thread, thread->GetName(), debugCs->GetScriptFileName().c_str(), label, nParams, thread->GetBytePointer());
 
 		if (nParams > 32)
 		{
