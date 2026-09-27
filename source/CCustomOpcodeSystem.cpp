@@ -825,7 +825,10 @@ namespace CLEO {
 	struct ScmFunction
 	{
 		unsigned short prevScmFunctionId, thisScmFunctionId;
+		BYTE callArgCount;
 		BYTE *retnAddress;
+		BYTE *savedStack[8];
+		WORD savedSP;
 		SCRIPT_VAR savedTls[32];
 		std::list<std::string> stringParams; // texts with this scope lifetime
 		bool savedCondResult;
@@ -833,15 +836,15 @@ namespace CLEO {
 		bool savedNotFlag;
 		static const size_t store_size = 0x400;
 		static ScmFunction *Store[store_size];
-		static size_t allocationPlace;			// contains an index of last allocated object
+		static size_t allocationPlace;\t\t// contains an index of last allocated object
 
 		void *operator new(size_t size)
 		{
 			size_t start_search = allocationPlace;
-			while (Store[allocationPlace])	// find first unused position in store
+			while (Store[allocationPlace])\t// find first unused position in store
 			{
-				if (++allocationPlace >= store_size) allocationPlace = 0;		// end of store reached
-				if (allocationPlace == start_search) throw std::bad_alloc();	// the store is filled up
+				if (++allocationPlace >= store_size) allocationPlace = 0;\t\t// end of store reached
+				if (allocationPlace == start_search) throw std::bad_alloc();\t// the store is filled up
 			}
 			ScmFunction *obj = reinterpret_cast<ScmFunction *>(::operator new(size));
 			Store[allocationPlace] = obj;
@@ -855,17 +858,27 @@ namespace CLEO {
 		}
 
 		ScmFunction(CRunningScript *thread) :
-			prevScmFunctionId(reinterpret_cast<CCustomScript*>(thread)->GetScmFunction())
+			prevScmFunctionId(reinterpret_cast<CCustomScript*>(thread)->GetScmFunction()),
+			callArgCount(0),
+			savedSP(0)
 		{
 			auto cs = reinterpret_cast<CCustomScript*>(thread);
 
-			// create snapshot of current scope
+			// Snapshot the parent function scope. The stack is part of a
+			// function scope as well: 0AA0/0AA1 must never consume the caller's
+			// GOSUB stack.
 			auto scope = cs->IsMission() ? missionLocals : cs->LocalVar;
 			std::copy(scope, scope + 32, savedTls);
+			std::copy(cs->Stack, cs->Stack + 8, savedStack);
+			savedSP = cs->SP;
 			savedCondResult = cs->bCondResult;
 			savedLogicalOp = cs->LogicalOp;
 			savedNotFlag = cs->NotFlag;
 
+			// Start a clean function-local condition state and a private
+			// GOSUB stack. Local variables are filled by opcode_0AB1.
+			std::fill(cs->Stack, cs->Stack + 8, nullptr);
+			cs->SP = 0;
 			cs->bCondResult = false;
 			cs->LogicalOp = eLogicalOperation::NONE;
 			cs->NotFlag = false;
@@ -875,11 +888,16 @@ namespace CLEO {
 
 		void Return(CRunningScript *thread)
 		{
-			// restore parent scope's local variables
 			auto cs = reinterpret_cast<CCustomScript*>(thread);
-			std::copy(savedTls, savedTls + 32, cs->IsMission() ? missionLocals : cs->LocalVar);
 
-			// process conditional result of just ended function in parent scope
+			// Restore the caller's local-variable scope and its private GOSUB
+			// stack before returning to the caller instruction stream.
+			std::copy(savedTls, savedTls + 32, cs->IsMission() ? missionLocals : cs->LocalVar);
+			std::copy(savedStack, savedStack + 8, cs->Stack);
+			cs->SP = savedSP;
+
+			// Process conditional result of the just-ended function in the
+			// caller scope.
 			bool condResult = cs->bCondResult;
 			if (savedNotFlag) condResult = !condResult;
 
@@ -888,12 +906,12 @@ namespace CLEO {
 				cs->bCondResult = savedCondResult && condResult;
 				cs->LogicalOp = --savedLogicalOp;
 			}
-			else if(savedLogicalOp >= eLogicalOperation::OR_2 && savedLogicalOp < eLogicalOperation::OR_END)
+			else if (savedLogicalOp >= eLogicalOperation::OR_2 && savedLogicalOp < eLogicalOperation::OR_END)
 			{
 				cs->bCondResult = savedCondResult || condResult;
 				cs->LogicalOp = --savedLogicalOp;
 			}
-			else // eLogicalOperation::NONE
+			else
 			{
 				cs->bCondResult = condResult;
 				cs->LogicalOp = savedLogicalOp;
@@ -903,7 +921,6 @@ namespace CLEO {
 			cs->SetScmFunction(prevScmFunctionId);
 		}
 	};
-
 	ScmFunction *ScmFunction::Store[store_size] = { /* default initializer - nullptr */ };
 	size_t ScmFunction::allocationPlace = 0;
 
@@ -1626,33 +1643,131 @@ namespace CLEO {
 		return OR_CONTINUE;
 	}
 
+	inline bool IsScmStringType(BYTE type)
+	{
+		return type == DT_STRING || type == DT_TEXTLABEL || type == DT_VARLEN_STRING ||
+			type == DT_VAR_STRING || type == DT_LVAR_STRING ||
+			type == DT_VAR_STRING_ARRAY || type == DT_LVAR_STRING_ARRAY ||
+			type == DT_VAR_TEXTLABEL || type == DT_LVAR_TEXTLABEL ||
+			type == DT_VAR_TEXTLABEL_ARRAY || type == DT_LVAR_TEXTLABEL_ARRAY;
+	}
+
+	inline bool IsScmStringDestinationType(BYTE type)
+	{
+		return type == DT_VAR_STRING || type == DT_LVAR_STRING ||
+			type == DT_VAR_STRING_ARRAY || type == DT_LVAR_STRING_ARRAY;
+	}
+
+	inline bool SkipOneScmParam(CRunningScript *thread)
+	{
+		switch (thread->ReadDataType())
+		{
+		case DT_VAR:
+		case DT_LVAR:
+		case DT_VAR_STRING:
+		case DT_LVAR_STRING:
+		case DT_VAR_TEXTLABEL:
+		case DT_LVAR_TEXTLABEL:
+			thread->IncPtr(2);
+			return true;
+		case DT_VAR_ARRAY:
+		case DT_LVAR_ARRAY:
+		case DT_VAR_STRING_ARRAY:
+		case DT_LVAR_STRING_ARRAY:
+		case DT_VAR_TEXTLABEL_ARRAY:
+		case DT_LVAR_TEXTLABEL_ARRAY:
+			thread->IncPtr(6);
+			return true;
+		case DT_BYTE:
+			thread->IncPtr();
+			return true;
+		case DT_WORD:
+			thread->IncPtr(2);
+			return true;
+		case DT_DWORD:
+		case DT_FLOAT:
+			thread->IncPtr(4);
+			return true;
+		case DT_VARLEN_STRING:
+		{
+			const BYTE length = thread->ReadDataByte();
+			thread->IncPtr(length);
+			return true;
+		}
+		case DT_TEXTLABEL:
+			thread->IncPtr(8);
+			return true;
+		case DT_STRING:
+			thread->IncPtr(16);
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	inline DWORD CountScmVarArgs(CRunningScript *thread)
+	{
+		BYTE *savedIp = thread->GetBytePointer();
+		DWORD count = 0;
+		while (*thread->GetBytePointer() != DT_END)
+		{
+			if (!SkipOneScmParam(thread))
+				break;
+			++count;
+		}
+		thread->SetIp(savedIp);
+		return count;
+	}
+
+	struct ScmReturnValue
+	{
+		SCRIPT_VAR value;
+		bool isString;
+		std::string stringValue;
+
+		ScmReturnValue() : value(), isString(false) {}
+	};
+
+	inline ScmFunction *GetActiveScmFunction(CCustomScript *cs)
+	{
+		if (!cs)
+			return nullptr;
+
+		const WORD id = cs->GetScmFunction();
+		if (id >= ScmFunction::store_size)
+			return nullptr;
+
+		return ScmFunction::Store[id];
+	}
+
 	//0AB1=-1,call_scm_func %1p%
 	OpcodeResult __stdcall opcode_0AB1(CRunningScript *thread)
 	{
-		int		label;
-		DWORD	nParams;
+		int label;
+		DWORD nParams;
 
 		*thread >> label >> nParams;
 
-		// Match CLEO 5 semantics: a CLEO function scope has exactly 32
-		// SCRIPT_VAR slots. Counts above 32 are rejected before any function
-		// state is created or parameters are consumed.
 		if (nParams > 32)
 		{
 			TRACE("[0AB1] Argument count %u exceeds supported limit of 32", nParams);
 			throw "Too many parameters in opcode 0AB1";
 		}
 
-		ScmFunction* scmFunc = new ScmFunction(thread);
+		// Make sure the declared input list actually exists before changing
+		// the current function scope. The remaining parameters belong to the
+		// caller's return slots.
+		if (CountScmVarArgs(thread) < nParams)
+			throw "Not enough parameters in opcode 0AB1";
+
+		ScmFunction *scmFunc = new ScmFunction(thread);
+		scmFunc->callArgCount = static_cast<BYTE>(nParams);
 
 		SCRIPT_VAR arguments[32] = {};
 		SCRIPT_VAR* locals = thread->IsMission() ? missionLocals : thread->GetVarPtr();
 		SCRIPT_VAR* localsEnd = locals + 32;
 		SCRIPT_VAR* storedLocals = scmFunc->savedTls;
 
-		// Collect arguments exactly once. Every argument is decoded directly
-		// from the script stream, so no native GTA parameter buffer is asked to
-		// hold more than the supported 32 values.
 		for (DWORD i = 0; i < nParams; i++)
 		{
 			SCRIPT_VAR* arg = arguments + i;
@@ -1695,22 +1810,18 @@ namespace CLEO {
 			}
 		}
 
-		// All arguments were read and the return address points immediately
-		// after the input argument list.
+		// Return execution to the caller's return-slot list. The child custom
+		// stream itself is unchanged: BaseIP, parentThread, childThreads and
+		// save metadata remain owned by CCustomScript/CScriptEngine.
 		scmFunc->retnAddress = thread->GetBytePointer();
 
-		// Store only the declared arguments; the destination is always within
-		// the fixed 32-slot CLEO local-variable scope.
 		memcpy(locals, arguments, nParams * sizeof(SCRIPT_VAR));
 
-		// Initialize the rest of the new scope for CLEO 4+ compatibility.
 		auto cs = reinterpret_cast<CCustomScript*>(thread);
 		if (cs->IsCustom() && cs->GetCompatibility() >= CLEO_VER_4_MIN)
 		{
 			for (DWORD i = nParams; i < 32; i++)
-			{
 				cs->SetIntVar(i, 0);
-			}
 		}
 
 		ThreadJump(thread, label);
@@ -1720,40 +1831,96 @@ namespace CLEO {
 	//0AB2=-1,ret
 	OpcodeResult __stdcall opcode_0AB2(CRunningScript *thread)
 	{
-		ScmFunction *scmFunc = ScmFunction::Store[reinterpret_cast<CCustomScript*>(thread)->GetScmFunction()];
+		auto cs = reinterpret_cast<CCustomScript*>(thread);
+		ScmFunction *scmFunc = GetActiveScmFunction(cs);
 		DWORD nRetParams;
+
 		*thread >> nRetParams;
 
-		// CLEO 5 also treats 32 as the hard function return limit. Reject an
-		// oversized return list before touching the native GTA parameter buffer
-		// or changing the current function scope.
+		if (!scmFunc)
+		{
+			TRACE("[0AB2] No active 0AB1 function for thread %p", thread);
+			throw "0AB2 without active 0AB1 function";
+		}
+
 		if (nRetParams > 32)
 		{
 			TRACE("[0AB2] Return argument count %u exceeds supported limit of 32", nRetParams);
 			throw "Too many parameters in opcode 0AB2";
 		}
 
-		SCRIPT_VAR returnValues[32] = {};
+		const DWORD actualReturnArgs = CountScmVarArgs(thread);
+		if (actualReturnArgs < nRetParams)
+			throw "Not enough parameters in opcode 0AB2";
 
-		if (nRetParams)
+		if (actualReturnArgs > nRetParams)
+			TRACE("[0AB2] warning: declared %u return values but %u were provided",
+				nRetParams, actualReturnArgs);
+
+		ScmReturnValue returnValues[32];
+
+		for (DWORD i = 0; i < nRetParams; ++i)
 		{
-			GetScriptParams(thread, nRetParams);
-			memcpy(returnValues, opcodeParams, nRetParams * sizeof(SCRIPT_VAR));
+			ScmReturnValue &value = returnValues[i];
+			const BYTE type = *thread->GetBytePointer();
+			value.isString = IsScmStringType(type);
+
+			if (value.isString)
+			{
+				char buffer[MAX_STR_LEN] = {};
+				const char *str = readString(thread, buffer, sizeof(buffer));
+				value.stringValue = str ? str : "";
+			}
+			else
+			{
+				*thread >> value.value.dwParam;
+			}
 		}
+
+		// Consume malformed extra return expressions before leaving the function.
+		if (actualReturnArgs > nRetParams)
+			SkipUnusedParameters(thread);
 
 		TRACE("[0AB2] before Return: name=%.*s thread=%p scm=%u returns=%u retn=%p",
 			8, thread->GetName(), thread, scmFunc->thisScmFunctionId, nRetParams, scmFunc->retnAddress);
+
 		scmFunc->Return(thread);
+
 		TRACE("[0AB2] after Return: name=%.*s thread=%p ip=%p",
 			8, thread->GetName(), thread, thread->GetBytePointer());
 
-		// Write each destination separately. This preserves GTA SA semantics for
-		// globals, locals, arrays and string destinations without asking
-		// SetScriptParams() to process more than one slot at a time.
-		for (DWORD i = 0; i < nRetParams; ++i)
+		const DWORD returnSlotCount = CountScmVarArgs(thread);
+		const DWORD writeCount = std::min(nRetParams, returnSlotCount);
+
+		if (returnSlotCount != nRetParams)
 		{
-			opcodeParams[0] = returnValues[i];
-			SetScriptParams(thread, 1);
+			TRACE("[0AB2] warning: function returned %u value(s), caller supplied %u return slot(s)",
+				nRetParams, returnSlotCount);
+		}
+
+		for (DWORD i = 0; i < writeCount; ++i)
+		{
+			if (returnValues[i].isString)
+			{
+				const BYTE destinationType = *thread->GetBytePointer();
+				if (!IsScmStringDestinationType(destinationType))
+					throw "Invalid string return destination in opcode 0AB2";
+
+				SCRIPT_VAR *destination = GetScriptParamPointer(thread);
+				if (!destination)
+					throw "Invalid string return destination in opcode 0AB2";
+
+				const size_t capacity = (destinationType == DT_VAR_TEXTLABEL ||
+					destinationType == DT_LVAR_TEXTLABEL) ? 8 : 16;
+				char *out = reinterpret_cast<char *>(destination);
+				std::fill(out, out + capacity, '\0');
+				strncpy(out, returnValues[i].stringValue.c_str(), capacity - 1);
+			}
+			else
+			{
+				opcodeParams[0] = returnValues[i].value;
+				SetScriptParams(thread, 1);
+			}
 		}
 
 		SkipUnusedParameters(thread);
