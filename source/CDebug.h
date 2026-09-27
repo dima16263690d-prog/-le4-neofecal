@@ -1,6 +1,8 @@
 #pragma once
 
-#include <set>
+#include <cstdarg>
+#include <fstream>
+#include <mutex>
 #include <string>
 
 #define TRACE __noop
@@ -16,7 +18,8 @@ class CDebug
 {
 #ifdef DEBUGIT
     std::ofstream m_hFile;
-    std::set<std::string> m_writtenMessages;
+    std::mutex m_mutex;
+    std::string m_lastMessage;
 
     void Write(const char *level, const char *message);
     void WriteFormatted(const char *level, const char *format, va_list args);
