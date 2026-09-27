@@ -1833,6 +1833,23 @@ namespace CLEO {
 		return scmFunc && scmFunc->ownerThread == cs;
 	}
 
+	void ReleaseScmFunctionsForScript(CCustomScript *cs)
+	{
+		if (!cs)
+			return;
+
+		while (true)
+		{
+			ScmFunction *scmFunc = GetActiveScmFunction(cs);
+			if (!scmFunc || scmFunc->ownerThread != cs)
+				break;
+
+			const WORD previousId = scmFunc->prevScmFunctionId;
+			cs->SetScmFunction(previousId);
+			delete scmFunc;
+		}
+	}
+
 	//0AB1=-1,cleo_call %1p%
 	OpcodeResult __stdcall opcode_0AB1(CRunningScript *thread)
 	{
