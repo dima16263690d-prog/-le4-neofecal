@@ -1762,7 +1762,7 @@ namespace CLEO {
 				{
 					strncpy(reinterpret_cast<char*>(target->pParam),
 						returnValues[i].pcParam, MAX_STR_LEN - 1);
-					reinterpret_cast<char*>(target->pParam)[MAX_STR_LEN - 1] = '\\0';
+					reinterpret_cast<char*>(target->pParam)[MAX_STR_LEN - 1] = '\0';
 				}
 			}
 			else
