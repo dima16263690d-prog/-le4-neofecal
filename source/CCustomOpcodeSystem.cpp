@@ -826,7 +826,10 @@ namespace CLEO {
 	{
 		unsigned short prevScmFunctionId, thisScmFunctionId;
 		BYTE callArgCount;
+		BYTE *callIP;
 		BYTE *retnAddress;
+		void *savedBaseIP;
+		size_t savedCodeSize;
 		BYTE *savedStack[8];
 		WORD savedSP;
 		SCRIPT_VAR savedTls[32];
@@ -834,17 +837,20 @@ namespace CLEO {
 		bool savedCondResult;
 		eLogicalOperation savedLogicalOp;
 		bool savedNotFlag;
+		std::string savedScriptFileDir;
+		std::string savedScriptFileName;
+
 		static const size_t store_size = 0x400;
 		static ScmFunction *Store[store_size];
-		static size_t allocationPlace;		// contains an index of last allocated object
+		static size_t allocationPlace;
 
 		void *operator new(size_t size)
 		{
 			size_t start_search = allocationPlace;
-			while (Store[allocationPlace])	// find first unused position in store
+			while (Store[allocationPlace])
 			{
-				if (++allocationPlace >= store_size) allocationPlace = 0;		// end of store reached
-				if (allocationPlace == start_search) throw std::bad_alloc();	// the store is filled up
+				if (++allocationPlace >= store_size) allocationPlace = 0;
+				if (allocationPlace == start_search) throw std::bad_alloc();
 			}
 			ScmFunction *obj = reinterpret_cast<ScmFunction *>(::operator new(size));
 			Store[allocationPlace] = obj;
@@ -857,16 +863,27 @@ namespace CLEO {
 			::operator delete(mem);
 		}
 
-		ScmFunction(CRunningScript *thread) :
-			prevScmFunctionId(reinterpret_cast<CCustomScript*>(thread)->GetScmFunction()),
-			callArgCount(0),
-			savedSP(0)
+		ScmFunction(CRunningScript *thread)
+			: prevScmFunctionId(reinterpret_cast<CCustomScript*>(thread)->GetScmFunction()),
+			  callArgCount(0),
+			  callIP(thread->GetBytePointer()),
+			  retnAddress(nullptr),
+			  savedBaseIP(nullptr),
+			  savedCodeSize(0),
+			  savedSP(0),
+			  savedCondResult(false),
+			  savedLogicalOp(eLogicalOperation::NONE),
+			  savedNotFlag(false)
 		{
 			auto cs = reinterpret_cast<CCustomScript*>(thread);
 
-			// Snapshot the parent function scope. The stack is part of a
-			// function scope as well: 0AA0/0AA1 must never consume the caller's
-			// GOSUB stack.
+			// Full execution-scope snapshot, following the CLEO 5 model while
+			// keeping the existing CLEO 4 CRunningScript layout intact.
+			savedBaseIP = cs->GetBasePointer();
+			savedCodeSize = cs->GetCodeSize();
+			savedScriptFileDir = cs->GetScriptFileDir();
+			savedScriptFileName = cs->GetScriptFileName();
+
 			auto scope = cs->IsMission() ? missionLocals : cs->LocalVar;
 			std::copy(scope, scope + 32, savedTls);
 			std::copy(cs->Stack, cs->Stack + 8, savedStack);
@@ -875,8 +892,8 @@ namespace CLEO {
 			savedLogicalOp = cs->LogicalOp;
 			savedNotFlag = cs->NotFlag;
 
-			// Start a clean function-local condition state and a private
-			// GOSUB stack. Local variables are filled by opcode_0AB1.
+			// Start a clean function scope. 0AB1 supplies its local arguments
+			// after this snapshot has been taken.
 			std::fill(cs->Stack, cs->Stack + 8, nullptr);
 			cs->SP = 0;
 			cs->bCondResult = false;
@@ -890,14 +907,17 @@ namespace CLEO {
 		{
 			auto cs = reinterpret_cast<CCustomScript*>(thread);
 
-			// Restore the caller's local-variable scope and its private GOSUB
-			// stack before returning to the caller instruction stream.
-			std::copy(savedTls, savedTls + 32, cs->IsMission() ? missionLocals : cs->LocalVar);
+			// Restore the complete caller execution context.
+			cs->SetBaseIp(savedBaseIP);
+			cs->SetCodeSize(savedCodeSize);
+			cs->SetScriptFileDir(savedScriptFileDir.c_str());
+			cs->SetScriptFileName(savedScriptFileName.c_str());
+
 			std::copy(savedStack, savedStack + 8, cs->Stack);
 			cs->SP = savedSP;
+			std::copy(savedTls, savedTls + 32, cs->IsMission() ? missionLocals : cs->LocalVar);
 
-			// Process conditional result of the just-ended function in the
-			// caller scope.
+			// Restore the caller's conditional aggregation state.
 			bool condResult = cs->bCondResult;
 			if (savedNotFlag) condResult = !condResult;
 
@@ -921,6 +941,7 @@ namespace CLEO {
 			cs->SetScmFunction(prevScmFunctionId);
 		}
 	};
+
 	ScmFunction *ScmFunction::Store[store_size] = { /* default initializer - nullptr */ };
 	size_t ScmFunction::allocationPlace = 0;
 
