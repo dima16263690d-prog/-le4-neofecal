@@ -417,7 +417,7 @@ namespace CLEO {
 			paramType == DT_LVAR_TEXTLABEL)
 		{
 			SCRIPT_VAR *var = GetScriptParamPointer(thread);
-			const char *src = var ? var->cParam : nullptr;
+			const char *src = var ? reinterpret_cast<const char *>(&var->cParam) : nullptr;
 
 			if (!src)
 				return nullptr;
