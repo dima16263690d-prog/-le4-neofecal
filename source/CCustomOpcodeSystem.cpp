@@ -1774,8 +1774,14 @@ namespace CLEO {
 
 		if (nParams > 32)
 		{
-			TRACE("[0AB1] Argument count %u exceeds supported limit of 32", nParams);
-			throw "Too many parameters in opcode 0AB1";
+			DIAG("[CLEO][ERROR][0AB1] Argument count %u exceeds supported limit of 32 in script '%.8s'; call skipped",
+				nParams, thread->GetName());
+
+			// Do not throw a C++ exception into the game. On GTA SA 1.0 US
+			// an uncaught MSVC exception becomes 0xE06D7363 in KERNELBASE.dll.
+			// Consume the complete vararg list and continue after the opcode.
+		SkipUnusedParameters(thread);
+			return OR_CONTINUE;
 		}
 
 		// Make sure the declared input list actually exists before changing
