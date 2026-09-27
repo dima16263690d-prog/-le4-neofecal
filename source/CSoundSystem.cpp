@@ -83,7 +83,9 @@ namespace CLEO
             return;
         }
 
-        imp_DefWindowProc = reinterpret_cast<LRESULT(__stdcall *)(HWND, UINT, WPARAM, LPARAM)>(originalWindowProc);
+        DWORD originalWindowProcTarget = 0;
+        inj.MemoryRead((memory_pointer)originalWindowProc, originalWindowProcTarget);
+        imp_DefWindowProc = reinterpret_cast<LRESULT(__stdcall *)(HWND, UINT, WPARAM, LPARAM)>(originalWindowProcTarget);
     }
 
     void EnumerateBassDevices(int& total, int& enabled, int& default_device)
