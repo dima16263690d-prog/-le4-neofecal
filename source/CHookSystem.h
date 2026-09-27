@@ -11,7 +11,8 @@ namespace CLEO
     enum HookType
     {
         HOOK_CALL = 0,
-        HOOK_JUMP = 1
+        HOOK_JUMP = 1,
+        HOOK_POINTER = 2
     };
 
     struct HookRecord
@@ -20,6 +21,7 @@ namespace CLEO
         size_t address = 0;
         size_t replacement = 0;
         size_t originalTarget = 0;
+        size_t originalValue = 0;
         BYTE originalBytes[5] = {};
         std::string name;
     };
@@ -57,6 +59,16 @@ namespace CLEO
             const char* name,
             memory_pointer address,
             size_t replacement
+        );
+
+        // Replaces the value stored at a pointer/data slot and remembers
+        // the exact original slot value for later restoration.
+        bool InstallPointer(
+            CCodeInjector& injector,
+            const char* name,
+            memory_pointer address,
+            size_t replacement,
+            size_t* originalValue = nullptr
         );
 
         bool Remove(CCodeInjector& injector, memory_pointer address);
