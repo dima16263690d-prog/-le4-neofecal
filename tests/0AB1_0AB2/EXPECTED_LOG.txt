@@ -1,0 +1,13 @@
+Ожидаемый порядок диагностики для одного запуска:
+
+[0AB1] ENTER ... params=2
+[0AB1] CALL ... params=2 retn=...
+[0AB1] JUMP ... 
+[0AB2] before Return ... returns=1 retn=...
+[0AB2] after Return ... ip=...
+
+На экране:
+0AB1/0AB2 PASS RESULT=30
+
+Не считать тест PASS только по наличию сообщений [0AB2].
+Нужно подтвердить полный вызов 0AB1 -> функция -> 0AB2 -> возврат RESULT=30 и сохранение caller locals.
