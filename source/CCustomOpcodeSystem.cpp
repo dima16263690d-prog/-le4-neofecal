@@ -1747,6 +1747,7 @@ namespace CLEO {
 		DWORD nParams;
 
 		*thread >> label >> nParams;
+		TRACE("[0AB1] ENTER thread=%p label=%d nParams=%u ip=%p", thread, label, nParams, thread->GetBytePointer());
 
 		if (nParams > 32)
 		{
@@ -1814,6 +1815,8 @@ namespace CLEO {
 		// stream itself is unchanged: BaseIP, parentThread, childThreads and
 		// save metadata remain owned by CCustomScript/CScriptEngine.
 		scmFunc->retnAddress = thread->GetBytePointer();
+		TRACE("[0AB1] READY func=%u retn=%p firstArg=%d secondArg=%d", scmFunc->thisScmFunctionId,
+			scmFunc->retnAddress, nParams > 0 ? arguments[0].nParam : 0, nParams > 1 ? arguments[1].nParam : 0);
 
 		memcpy(locals, arguments, nParams * sizeof(SCRIPT_VAR));
 
@@ -1825,6 +1828,7 @@ namespace CLEO {
 		}
 
 		ThreadJump(thread, label);
+		TRACE("[0AB1] JUMP func=%u newIP=%p", scmFunc->thisScmFunctionId, thread->GetBytePointer());
 		return OR_CONTINUE;
 	}
 
@@ -1833,6 +1837,7 @@ namespace CLEO {
 	{
 		auto cs = reinterpret_cast<CCustomScript *>(thread);
 		ScmFunction *scmFunc = GetActiveScmFunction(cs);
+		TRACE("[0AB2] ENTER thread=%p func=%u ip=%p", thread, cs->GetScmFunction(), thread->GetBytePointer());
 
 		if (!scmFunc)
 		{
@@ -1873,8 +1878,11 @@ namespace CLEO {
 			memcpy(returnValues, opcodeParams, nRetParams * sizeof(SCRIPT_VAR));
 		}
 
+		TRACE("[0AB2] RETURN value0=%d retn=%p", nRetParams ? returnValues[0].nParam : 0, scmFunc->retnAddress);
+
 		// Restore caller scope and jump to its return-slot list.
 		scmFunc->Return(thread);
+		TRACE("[0AB2] AFTER_RETURN ip=%p", thread->GetBytePointer());
 		delete scmFunc;
 
 		// Write results through the game's own parameter writer.
