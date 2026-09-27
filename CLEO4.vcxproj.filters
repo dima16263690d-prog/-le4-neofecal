@@ -15,6 +15,12 @@
     <ClCompile Include="source\CCustomOpcodeSystem.cpp">
       <Filter>source</Filter>
     </ClCompile>
+    <ClCompile Include="source\CCustomScript.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="source\ScmFunction.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
     <ClCompile Include="source\CDebug.cpp">
       <Filter>source</Filter>
     </ClCompile>
@@ -60,6 +66,12 @@
       <Filter>source</Filter>
     </ClInclude>
     <ClInclude Include="source\CCustomOpcodeSystem.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\CCustomScript.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\ScmFunction.h">
       <Filter>source</Filter>
     </ClInclude>
     <ClInclude Include="source\CDebug.h">
