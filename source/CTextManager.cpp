@@ -222,7 +222,12 @@ namespace CLEO
         cheatString = gvm.TranslateMemoryAddress(MA_CHEAT_STRING);
         mpackNumber = gvm.TranslateMemoryAddress(MA_MPACK_NUMBER);
         CText__Get = gvm.TranslateMemoryAddress(MA_CALL_CTEXT_LOCATE);
-        inj.InjectFunction(CText__locate, CText__Get);
+        GetInstance().HookSystem.InstallJump(
+            inj,
+            "CTextLocate",
+            CText__Get,
+            (size_t)CText__locate
+        );
     }
 
     CTextManager::FxtEntry::FxtEntry(const char *_text, bool _static) : text(_text), is_static(_static)
