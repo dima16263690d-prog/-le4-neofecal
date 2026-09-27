@@ -63,6 +63,7 @@ namespace CLEO
 
         CDmaFix					DmaFix;
         CGameMenu				GameMenu;
+        CHookSystem				HookSystem;
         CCodeInjector			CodeInjector;
         CGameVersionManager		VersionManager;
         CScriptEngine			ScriptEngine;
