@@ -406,29 +406,37 @@ namespace CLEO {
 		auto paramType = *thread->GetBytePointer();
 		if (!paramType) return nullptr;
 
-		// Our CLEO string path is explicit for script string variables.
-		// Do not depend on GTA's native GetScriptStringParam() here: the
-		// custom 0AB1/0AB2 function scope can redirect local string slots
-		// into ScmFunction::savedTls. Resolve the slot ourselves and then
-		// advance the opcode stream through GetScriptParamPointer().
+		// String variables are stored in the script-variable storage itself.
+		// A SCRIPT_VAR is only one 32-bit slot, so cParam is a single byte and
+		// cannot be used as a string pointer. For 0AB1/0AB2, GetScriptParamPointer()
+		// resolves the current function-local slot (including savedTls), therefore
+		// read the string from the slot memory directly.
 		if (paramType == DT_VAR_STRING ||
 			paramType == DT_LVAR_STRING ||
 			paramType == DT_VAR_TEXTLABEL ||
-			paramType == DT_LVAR_TEXTLABEL)
+			paramType == DT_LVAR_TEXTLABEL ||
+			paramType == DT_VAR_STRING_ARRAY ||
+			paramType == DT_LVAR_STRING_ARRAY ||
+			paramType == DT_VAR_TEXTLABEL_ARRAY ||
+			paramType == DT_LVAR_TEXTLABEL_ARRAY)
 		{
 			SCRIPT_VAR *var = GetScriptParamPointer(thread);
-			const char *src = var ? var->cParam : nullptr;
-
-			if (!src)
+			if (!var)
 				return nullptr;
+
+			const char *src = reinterpret_cast<const char *>(var);
+			const size_t storageSize =
+				(paramType == DT_VAR_TEXTLABEL ||
+				 paramType == DT_LVAR_TEXTLABEL ||
+				 paramType == DT_VAR_TEXTLABEL_ARRAY ||
+				 paramType == DT_LVAR_TEXTLABEL_ARRAY) ? 8 : 16;
 
 			if (buf != nullptr)
 			{
-				if (size > 0)
-				{
-					strncpy(buf, src, size - 1);
-					buf[size - 1] = '\0';
-				}
+				const size_t copySize = std::min<size_t>(size - 1, storageSize - 1);
+				if (copySize)
+					memcpy(buf, src, copySize);
+				buf[copySize] = '\0';
 				return buf;
 			}
 
