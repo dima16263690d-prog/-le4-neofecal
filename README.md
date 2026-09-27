@@ -510,6 +510,75 @@ Save/Load
 ```
 
 Цель — проверить именно взаимодействие `CCustomScript/0E6F` и `ScmFunction`, не изменяя архитектуру `0E6F`.
+## Этап 4 — HookSystem v1: CALL/JUMP hooks (28.09.2026)
+
+Добавлен первый отдельный менеджер legacy-инъекций поверх существующей 5-байтовой модели `CALL/JMP`.
+
+### Что сделано
+
+- Добавлен `source/CHookSystem.h`.
+- Добавлен `source/CHookSystem.cpp`.
+- Обновлены `CLEO4.vcxproj` и `CLEO4.vcxproj.filters`.
+- `CCleoInstance` получил экземпляр `CHookSystem`.
+- HookSystem хранит адрес патча, адрес replacement, имя hook, тип `CALL/JUMP` и исходные 5 байт.
+- Для `CALL` дополнительно сохраняется вычисленный адрес оригинальной функции.
+- Повторная установка hook на тот же адрес отклоняется.
+- Реализованы `Remove()`, `RemoveAll()` и `IsInstalled()`.
+- Legacy `MemCall()` / `MemJump()` пока не удаляются и не переписываются глобально.
+- Остальные существующие hooks пока продолжают работать через старый `CCodeInjector`, чтобы миграция выполнялась по одному и была проверяема.
+
+### Runtime-проверка
+
+На **28.09.2026** выполнен runtime-тест на **GTA San Andreas 1.0 US**.
+
+Первым hook через HookSystem был переведён:
+
+```text
+UpdateGameLogics
+```
+
+Лог подтвердил:
+
+```text
+[HookSystem] Installed CALL 'UpdateGameLogics' at 0x0053E981 -> replacement original=0x0053BEE0
+```
+
+Вторым hook через HookSystem был переведён:
+
+```text
+CreateMainWindow
+```
+
+Лог подтвердил:
+
+```text
+[HookSystem] Installed CALL 'CreateMainWindow' at 0x007487A8 -> replacement original=0x00745560
+```
+
+После обоих hook продолжили работать:
+
+- создание главного окна;
+- SoundSystem;
+- загрузка обычных CLEO/ModLoader `.cs`;
+- `0A92`;
+- `0AB1/0AB2`;
+- тест `123 → 123`;
+- завершение и удаление custom scripts;
+- восстановление защиты памяти при завершении CLEO.
+
+Crash/access violation в проверенном сценарии не зафиксирован.
+
+### Что пока не переводилось
+
+- pointer patch `MA_DEF_WINDOW_PROC_PTR`;
+- hooks внутри `CScriptEngine::Inject()`;
+- остальные старые `ReplaceFunction()` / `InjectFunction()`.
+
+Эти типы будут переводиться отдельно после проверки соответствующей модели patch.
+
+### Следующий технический этап
+
+Отдельно реализовать безопасный тип **pointer/data hook**, используемый `MA_DEF_WINDOW_PROC_PTR`, с сохранением исходного значения и возможностью отката. Только после этого продолжать миграцию остальных legacy hooks.
 ## Структурный рефакторинг — 27.09.2026
 
 Выполнено безопасное разделение внутреннего кода без изменения legacy execution flow.
