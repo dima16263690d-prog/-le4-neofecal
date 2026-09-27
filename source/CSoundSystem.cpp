@@ -70,10 +70,20 @@ namespace CLEO
         pRwCamera = gvm.TranslateMemoryAddress(MA_RW_CAMERA_PP);
         auto addr = gvm.TranslateMemoryAddress(MA_DEF_WINDOW_PROC_PTR);
         static const auto pWindowProcHook = &HOOK_DefWindowProc;
-        DWORD ptr;
-        inj.MemoryRead(addr, ptr);
-        inj.MemoryRead(ptr, imp_DefWindowProc);
-        inj.MemoryWrite(addr, (DWORD)&pWindowProcHook);
+
+        size_t originalWindowProc = 0;
+        if (!GetInstance().HookSystem.InstallPointer(
+                inj,
+                "DefWindowProc",
+                addr,
+                (size_t)&pWindowProcHook,
+                &originalWindowProc))
+        {
+            Error("CSoundSystem::Inject(): failed to install DefWindowProc pointer hook");
+            return;
+        }
+
+        imp_DefWindowProc = reinterpret_cast<LRESULT(__stdcall *)(HWND, UINT, WPARAM, LPARAM)>(originalWindowProc);
     }
 
     void EnumerateBassDevices(int& total, int& enabled, int& default_device)
