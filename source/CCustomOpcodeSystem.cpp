@@ -1634,6 +1634,19 @@ namespace CLEO {
 
 		*thread >> label >> nParams;
 
+		// GTA SA provides only 32 SCRIPT_VAR entries for opcode parameters.
+		// Do not create a function scope for an unsupported argument count.
+		// Consume the declared arguments one by one so the native collector is
+		// never asked to write more than one value into the 32-entry buffer.
+		if (nParams > 32)
+		{
+			TRACE("[0AB1] Argument count %u exceeds GTA SA limit of 32; call skipped", nParams);
+			for (DWORD i = 0; i < nParams; ++i)
+				GetScriptParams(thread, 1);
+			SkipUnusedParameters(thread);
+			return OR_CONTINUE;
+		}
+
 		ScmFunction* scmFunc = new ScmFunction(thread);
 		
 		SCRIPT_VAR arguments[32] = {};
@@ -1680,14 +1693,6 @@ namespace CLEO {
 			}
 		}
 
-		// opcodeParams is a GTA-owned 32-entry buffer.
-		// Consume additional arguments one at a time so the native collector
-		// is never asked to write beyond the 32-entry limit.
-		if (nParams > 32)
-		{
-			for (DWORD i = 32; i < nParams; ++i)
-				GetScriptParams(thread, 1);
-		}
 
 		// all areguments read
 		scmFunc->retnAddress = thread->GetBytePointer();
