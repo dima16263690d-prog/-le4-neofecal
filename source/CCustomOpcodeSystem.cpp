@@ -189,7 +189,7 @@ namespace CLEO {
 
 	WORD last_opcode = 0;
 	WORD last_custom_opcode = 0;
-	char last_thread[8] = "none";
+	char last_thread[9] = "none";
 	CRunningScript * last_script;
 	ptrdiff_t last_off = -1;
 
@@ -227,6 +227,7 @@ namespace CLEO {
 				last_opcode = opcode;
 				last_off = off;
 				memcpy(last_thread, thread->GetName(), 8);
+				last_thread[8] = '\0';
 				thread->SetNotFlag((opcode & 0x8000) != 0);
 				opcode &= 0x7FFF;
 				res = newOpcodeHandlerTable[opcode / 100](thread, opcode);
