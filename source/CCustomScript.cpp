@@ -2,6 +2,7 @@
 #include "CCustomScript.h"
 #include "cleo.h"
 #include "crc32.h"
+#include "ScmFunction.h"
 
 namespace CLEO
 {
@@ -301,6 +302,8 @@ memcpy(Name, parent->Name, sizeof(Name));
 
     CCustomScript::~CCustomScript()
     {
+        ScmFunction::ReleaseForScript(this);
+
         if (parentThread)
         {
             parentThread->childThreads.remove(this);
