@@ -11,17 +11,60 @@ namespace
     {
         vsnprintf_s(buffer, bufferSize, _TRUNCATE, format, args);
     }
+
+    void NormalizeLogText(char *message)
+    {
+        struct Tag
+        {
+            const char *from;
+            const char *to;
+        };
+
+        static const Tag tags[] =
+        {
+            { "[CLEO]", "[Cleo]" },
+            { "[ERROR]", "[Error]" },
+            { "[WARNING]", "[Warning]" },
+            { "[INFO]", "[Info]" },
+            { "[CUSTOM]", "[Custom]" },
+            { "[RESTORE]", "[Restore]" },
+            { "[LOAD]", "[Load]" },
+            { "[SAVE]", "[Save]" },
+            { "[END]", "[End]" },
+            { "[STOP]", "[Stop]" },
+            { "[DELETE]", "[Delete]" },
+            { "[CREATE]", "[Create]" },
+            { "[REGISTER]", "[Register]" }
+        };
+
+        for (const auto &tag : tags)
+        {
+            char *pos = nullptr;
+            while ((pos = strstr(message, tag.from)) != nullptr)
+            {
+                const size_t fromLen = strlen(tag.from);
+                const size_t toLen = strlen(tag.to);
+
+                if (toLen <= fromLen)
+                {
+                    memcpy(pos, tag.to, toLen);
+                    if (toLen < fromLen)
+                        memmove(pos + toLen, pos + fromLen, strlen(pos + fromLen) + 1);
+                }
+            }
+        }
+    }
 }
 
 CDebug::CDebug()
     : m_hFile(szLogFileName)
 {
-    Write("INFO", "Log started.");
+    Write("Info", "Log started.");
 }
 
 CDebug::~CDebug()
 {
-    Write("INFO", "Log finished.");
+    Write("Info", "Log finished.");
 }
 
 void CDebug::Write(const char *level, const char *message)
@@ -32,6 +75,10 @@ void CDebug::Write(const char *level, const char *message)
     if (!m_writtenMessages.insert(key).second)
         return;
 
+    char normalized[2048];
+    strncpy_s(normalized, sizeof(normalized), message, _TRUNCATE);
+    NormalizeLogText(normalized);
+
     SYSTEMTIME t;
     char szBuf[2048];
 
@@ -40,7 +87,7 @@ void CDebug::Write(const char *level, const char *message)
     sprintf_s(
         szBuf,
         sizeof(szBuf),
-        "%02d/%02d/%04d %02d:%02d:%02d.%03d [%s] %s",
+        "%02d/%02d/%04d %02d:%02d:%02d.%03d [%-7s] %s",
         t.wDay,
         t.wMonth,
         t.wYear,
@@ -49,7 +96,7 @@ void CDebug::Write(const char *level, const char *message)
         t.wSecond,
         t.wMilliseconds,
         level,
-        message
+        normalized
     );
 
     m_hFile << szBuf << std::endl;
@@ -70,7 +117,7 @@ void CDebug::Trace(const char *format, ...)
 {
     va_list args;
     va_start(args, format);
-    WriteFormatted("INFO", format, args);
+    WriteFormatted("Info", format, args);
     va_end(args);
 }
 
@@ -78,7 +125,7 @@ void CDebug::TraceWarning(const char *format, ...)
 {
     va_list args;
     va_start(args, format);
-    WriteFormatted("WARNING", format, args);
+    WriteFormatted("Warning", format, args);
     va_end(args);
 }
 
@@ -86,7 +133,7 @@ void CDebug::TraceError(const char *format, ...)
 {
     va_list args;
     va_start(args, format);
-    WriteFormatted("ERROR", format, args);
+    WriteFormatted("Error", format, args);
     va_end(args);
 }
 
@@ -99,18 +146,18 @@ void CDebug::TraceDiagnostic(const char *format, ...)
     FormatMessage(message, sizeof(message), format, args);
     va_end(args);
 
-    const char *level = "INFO";
+    const char *level = "Info";
 
     if (strstr(message, "[ERROR]") || strstr(message, "[Error]") ||
         strstr(message, "error") || strstr(message, "Error") ||
         strstr(message, "failed") || strstr(message, "Failed"))
     {
-        level = "ERROR";
+        level = "Error";
     }
     else if (strstr(message, "[WARNING]") || strstr(message, "[Warning]") ||
              strstr(message, "warning") || strstr(message, "Warning"))
     {
-        level = "WARNING";
+        level = "Warning";
     }
 
     Write(level, message);
