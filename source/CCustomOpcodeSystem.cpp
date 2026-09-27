@@ -1634,31 +1634,29 @@ namespace CLEO {
 
 		*thread >> label >> nParams;
 
-		// GTA SA provides only 32 SCRIPT_VAR entries for opcode parameters.
-		// Do not create a function scope for an unsupported argument count.
-		// Consume the declared arguments one by one so the native collector is
-		// never asked to write more than one value into the 32-entry buffer.
+		// Match CLEO 5 semantics: a CLEO function scope has exactly 32
+		// SCRIPT_VAR slots. Counts above 32 are rejected before any function
+		// state is created or parameters are consumed.
 		if (nParams > 32)
 		{
-			TRACE("[0AB1] Argument count %u exceeds GTA SA limit of 32; call skipped", nParams);
-			for (DWORD i = 0; i < nParams; ++i)
-				GetScriptParams(thread, 1);
-			SkipUnusedParameters(thread);
-			return OR_CONTINUE;
+			TRACE("[0AB1] Argument count %u exceeds supported limit of 32", nParams);
+			throw "Too many parameters in opcode 0AB1";
 		}
 
 		ScmFunction* scmFunc = new ScmFunction(thread);
-		
+
 		SCRIPT_VAR arguments[32] = {};
 		SCRIPT_VAR* locals = thread->IsMission() ? missionLocals : thread->GetVarPtr();
 		SCRIPT_VAR* localsEnd = locals + 32;
 		SCRIPT_VAR* storedLocals = scmFunc->savedTls;
 
-		// collect arguments
-		for (DWORD i = 0; i < std::min<DWORD>(nParams, 32); i++)
+		// Collect arguments exactly once. Every argument is decoded directly
+		// from the script stream, so no native GTA parameter buffer is asked to
+		// hold more than the supported 32 values.
+		for (DWORD i = 0; i < nParams; i++)
 		{
 			SCRIPT_VAR* arg = arguments + i;
-				
+
 			switch (*thread->GetBytePointer())
 			{
 			case DT_FLOAT:
@@ -1677,7 +1675,7 @@ namespace CLEO {
 			case DT_VAR_TEXTLABEL:
 			case DT_LVAR_TEXTLABEL:
 				arg->pParam = GetScriptParamPointer(thread);
-				if (arg->pParam >= locals && arg->pParam < localsEnd) // correct scoped variable's pointer
+				if (arg->pParam >= locals && arg->pParam < localsEnd)
 				{
 					arg->dwParam -= (DWORD)locals;
 					arg->dwParam += (DWORD)storedLocals;
@@ -1687,31 +1685,34 @@ namespace CLEO {
 			case DT_STRING:
 			case DT_TEXTLABEL:
 			case DT_VARLEN_STRING:
-				scmFunc->stringParams.emplace_back(readString(thread)); // those texts exists in script code, but without terminator character. Copy is necessary
+				scmFunc->stringParams.emplace_back(readString(thread));
 				arg->pcParam = (char*)scmFunc->stringParams.back().c_str();
 				break;
+
+			default:
+				delete scmFunc;
+				throw "Invalid parameter type in opcode 0AB1";
 			}
 		}
 
-
-		// all areguments read
+		// All arguments were read and the return address points immediately
+		// after the input argument list.
 		scmFunc->retnAddress = thread->GetBytePointer();
 
-		// pass at most 32 arguments into the 32 available local variables
-		const DWORD storedParams = std::min<DWORD>(nParams, 32);
-		memcpy(locals, arguments, storedParams * sizeof(SCRIPT_VAR));
+		// Store only the declared arguments; the destination is always within
+		// the fixed 32-slot CLEO local-variable scope.
+		memcpy(locals, arguments, nParams * sizeof(SCRIPT_VAR));
 
-		// initialize rest of new scope local variables
+		// Initialize the rest of the new scope for CLEO 4+ compatibility.
 		auto cs = reinterpret_cast<CCustomScript*>(thread);
-		if (cs->IsCustom() && cs->GetCompatibility() >= CLEO_VER_4_MIN) // CLEO 3 did not initialised local variables
+		if (cs->IsCustom() && cs->GetCompatibility() >= CLEO_VER_4_MIN)
 		{
-			for (DWORD i = storedParams; i < 32; i++)
+			for (DWORD i = nParams; i < 32; i++)
 			{
-				cs->SetIntVar(i, 0); // fill with zeros
+				cs->SetIntVar(i, 0);
 			}
 		}
 
-		// jump to label
 		ThreadJump(thread, label);
 		return OR_CONTINUE;
 	}
@@ -1723,40 +1724,37 @@ namespace CLEO {
 		DWORD nRetParams;
 		*thread >> nRetParams;
 
-		// 0AB2 has two parameter lists:
-		//   1. return operands in the callee (which values to return);
-		//   2. return destinations in the caller (where to store them).
-		// GTA SA exposes only 32 SCRIPT_VAR entries in opcodeParams, so keep
-		// the native parameter semantics but never ask the game to collect
-		// more than 32 values in one call.
-		const DWORD storedRetParams = std::min<DWORD>(nRetParams, 32);
-		SCRIPT_VAR returnValues[32] = {};
-
-		if (storedRetParams)
+		// CLEO 5 also treats 32 as the hard function return limit. Reject an
+		// oversized return list before touching the native GTA parameter buffer
+		// or changing the current function scope.
+		if (nRetParams > 32)
 		{
-			GetScriptParams(thread, storedRetParams);
-			memcpy(returnValues, opcodeParams, storedRetParams * sizeof(SCRIPT_VAR));
+			TRACE("[0AB2] Return argument count %u exceeds supported limit of 32", nRetParams);
+			throw "Too many parameters in opcode 0AB2";
 		}
 
-		// Consume any return operands above the native 32-entry limit one by one.
-		for (DWORD i = storedRetParams; i < nRetParams; ++i)
-			GetScriptParams(thread, 1);
+		SCRIPT_VAR returnValues[32] = {};
 
-		TRACE("[0AB2] before Return: thread=%p scm=%u returns=%u retn=%p", thread, scmFunc->thisScmFunctionId, storedRetParams, scmFunc->retnAddress);
+		if (nRetParams)
+		{
+			GetScriptParams(thread, nRetParams);
+			memcpy(returnValues, opcodeParams, nRetParams * sizeof(SCRIPT_VAR));
+		}
+
+		TRACE("[0AB2] before Return: thread=%p scm=%u returns=%u retn=%p",
+			thread, scmFunc->thisScmFunctionId, nRetParams, scmFunc->retnAddress);
 		scmFunc->Return(thread);
 		TRACE("[0AB2] after Return: thread=%p ip=%p", thread, thread->GetBytePointer());
 
-		// Return() moved IP to the caller's return destinations. Use the native
-		// SetScriptParams one destination at a time so globals, locals, arrays
-		// and string destinations keep GTA SA's original semantics.
-		for (DWORD i = 0; i < storedRetParams; ++i)
+		// Write each destination separately. This preserves GTA SA semantics for
+		// globals, locals, arrays and string destinations without asking
+		// SetScriptParams() to process more than one slot at a time.
+		for (DWORD i = 0; i < nRetParams; ++i)
 		{
 			opcodeParams[0] = returnValues[i];
 			SetScriptParams(thread, 1);
 		}
 
-		// The dynamic parameter terminator and any remaining operands belong to
-		// the caller-side 0AB1 instruction.
 		SkipUnusedParameters(thread);
 		delete scmFunc;
 		return OR_CONTINUE;
