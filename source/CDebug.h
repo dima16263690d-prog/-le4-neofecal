@@ -31,9 +31,16 @@ public:
     void Trace(const char *format, ...);
     void TraceWarning(const char *format, ...);
     void TraceError(const char *format, ...);
+    void TraceDiagnostic(const char *format, ...);
 
 #endif
 };
+
+#ifdef DEBUGIT
+#define DIAG(format,...) {Debug.TraceDiagnostic(format, __VA_ARGS__);}
+#else
+#define DIAG(...) __noop
+#endif
 
 extern CDebug Debug;
 void Warning(const char *);
