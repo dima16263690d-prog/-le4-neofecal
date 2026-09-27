@@ -1053,6 +1053,8 @@ namespace CLEO
                 std::for_each(savedThreads.begin(), savedThreads.end(), [&savedThreads, &ss](CCustomScript *cs)
                 {
                     ThreadSavingInfo savingInfo(cs);
+                    if (HasActiveScmFunction(cs))
+                        TRACE("[SAVE][SCMFUNC] %.8s id=%u ip=%td", cs->Name, cs->GetScmFunction(), savingInfo.ip_diff);
                     WriteBinary(ss, savingInfo);
                 });
 
