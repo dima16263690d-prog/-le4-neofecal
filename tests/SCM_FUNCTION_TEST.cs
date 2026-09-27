@@ -27,7 +27,7 @@ wait 2000
 0AD1: show_formatted_text_highpriority "FUNCTEST START" time 2000
 wait 500
 
-0AB1: call_scm_func @ADD_VALUES 2 10 20 4@
+0AB1: cleo_call @ADD_VALUES 2 10 20 4@
 
 0AD1: show_formatted_text_highpriority "RESULT=%d C0=%d C1=%d" time 5000 4@ 0@ 1@
 wait 6000
@@ -38,4 +38,4 @@ jump @LOOP
 
 :ADD_VALUES
 005A: 0@ += 1@
-0AB2: ret 1 0@
+0AB2: cleo_return 1 0@
