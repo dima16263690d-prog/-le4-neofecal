@@ -15,6 +15,9 @@
     <ClCompile Include="source\CMemory.cpp">
       <Filter>source</Filter>
     </ClCompile>
+    <ClCompile Include="source\CHookSystem.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
     <ClCompile Include="source\CCustomOpcodeSystem.cpp">
       <Filter>source</Filter>
     </ClCompile>
@@ -69,6 +72,9 @@
       <Filter>source</Filter>
     </ClInclude>
     <ClInclude Include="source\CMemory.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\CHookSystem.h">
       <Filter>source</Filter>
     </ClInclude>
     <ClInclude Include="source\CCustomOpcodeSystem.h">
