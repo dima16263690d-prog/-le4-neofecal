@@ -1154,17 +1154,6 @@ namespace CLEO
     {
         const bool wasChild = cs->parentThread != nullptr;
 
-        // 0E6F child scripts execute from the parent's code buffer.
-        // Never let the child/base-class deletion path treat that inherited
-        // BaseIP as memory owned by the child. This mirrors the original
-        // CLEO 4 child-thread cleanup behavior.
-        if (wasChild)
-            cs->BaseIP = 0;
-
-        // A custom script may own an active 0AB1 ScmFunction chain.
-        // Release that runtime state before the script object is deleted.
-        ReleaseScmFunctionsForScript(cs);
-
         // Detach this script from its parent first so removing a child cannot
         // leave a stale pointer in the parent's child list.
         if (cs->parentThread)
