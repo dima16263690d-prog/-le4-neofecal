@@ -72,7 +72,9 @@ namespace CLEO
 
         template<typename T> void MemoryReadOffset(memory_pointer addr, T& result, bool force_vp = false)
         {
-            CMemoryProtection protection(addr.pointer, sizeof(T), PAGE_EXECUTE_READWRITE);
+            CMemoryProtection protection;
+            if (force_vp)
+                protection = CMemoryProtection(addr.pointer, sizeof(T), PAGE_EXECUTE_READWRITE);
             if (force_vp && !protection.IsActive())
                 return;
 
@@ -92,7 +94,9 @@ namespace CLEO
         // copies array of objects given by memory address @addr to the @result array of length @cnt
         template<typename T> void MemoryRead(memory_pointer addr, T *result, size_t n, bool force_vp = false)
         {
-            CMemoryProtection protection(addr.pointer, sizeof(T) * n, PAGE_EXECUTE_READWRITE);
+            CMemoryProtection protection;
+            if (force_vp)
+                protection = CMemoryProtection(addr.pointer, sizeof(T) * n, PAGE_EXECUTE_READWRITE);
             if (force_vp && !protection.IsActive())
                 return;
 
