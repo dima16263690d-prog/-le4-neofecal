@@ -1,5 +1,8 @@
 #pragma once
 
+#include <set>
+#include <string>
+
 #define TRACE __noop
 
 #ifdef DEBUGIT
@@ -13,23 +16,21 @@ class CDebug
 {
 #ifdef DEBUGIT
     std::ofstream m_hFile;
+    std::set<std::string> m_writtenMessages;
+
+    void Write(const char *level, const char *message);
+    void WriteFormatted(const char *level, const char *format, va_list args);
 #endif
 
 public:
 #ifdef DEBUGIT
 
-    CDebug() : m_hFile(szLogFileName)
-    {
-        TraceAlways("Log started.");
-    }
-
-    ~CDebug()
-    {
-        TraceAlways("Log finished.");
-    }
+    CDebug();
+    ~CDebug();
 
     void Trace(const char *format, ...);
-    void TraceAlways(const char *format, ...);
+    void TraceWarning(const char *format, ...);
+    void TraceError(const char *format, ...);
 
 #endif
 };
