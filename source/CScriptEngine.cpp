@@ -436,6 +436,18 @@ namespace CLEO
 
     std::vector<ScmFunctionSaveInfo> pendingScmFunctionSaves;
 
+    template<typename T>
+    void inline ReadBinary(std::istream& stream, T& value);
+
+    template<typename T>
+    void inline ReadBinary(std::istream& stream, T* value, size_t size);
+
+    template<typename T>
+    void inline WriteBinary(std::ostream& stream, const T& value);
+
+    template<typename T>
+    void inline WriteBinary(std::ostream& stream, const T* value, size_t size);
+
     inline int32_t SavePointerOffset(const BYTE *ptr, const BYTE *base)
     {
         if (!ptr)
@@ -1267,10 +1279,11 @@ namespace CLEO
 
             try
             {
-                std::ofstream functionFile(
-                    nSlot >= 0 ? ("./cleo/cleo_saves/cs" + std::to_string(nSlot) + ".functions.sav") : "",
-                    std::ios::binary
-                );
+                char function_safe_name[MAX_PATH];
+                _snprintf_s(function_safe_name, sizeof(function_safe_name), _TRUNCATE,
+                    "./cleo/cleo_saves/cs%d.functions.sav", nSlot);
+
+                std::ofstream functionFile(function_safe_name, std::ios::binary);
 
                 if (functionFile.is_open())
                 {
@@ -1311,8 +1324,8 @@ namespace CLEO
                         }
                     }
 
-                    DIAG("[CLEO][SAVE][ScmFunction] saved function states=%u file=./cleo/cleo_saves/cs%d.functions.sav",
-                        functionHeader.n_functions, nSlot);
+                    DIAG("[CLEO][SAVE][ScmFunction] saved function states=%u file=%s",
+                        functionHeader.n_functions, function_safe_name);
                 }
                 else
                 {
