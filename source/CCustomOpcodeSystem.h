@@ -17,6 +17,7 @@ namespace CLEO
     typedef OpcodeResult(__stdcall * CustomOpcodeHandler)(CRunningScript*);
     void ResetScmFunctionStore();
     bool HasActiveScmFunction(CCustomScript *cs);
+    void ReleaseScmFunctionsForScript(CCustomScript *cs);
     bool is_legacy_handle(DWORD dwHandle);
     FILE * convert_handle_to_file(DWORD dwHandle);
 
