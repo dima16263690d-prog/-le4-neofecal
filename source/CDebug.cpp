@@ -7,81 +7,50 @@ CDebug Debug;
 
 namespace
 {
-    bool IsImportantDiagnostic(const char *message)
+    void FormatMessage(char *buffer, size_t bufferSize, const char *format, va_list args)
     {
-        // TRACE is intentionally quiet for normal/high-frequency runtime activity.
-        // Errors, failed operations and invalid states remain visible.
-        static const char *keywords[] =
-        {
-            "[Error]",
-            "[Warning]",
-            "Failed",
-            "failed",
-            "Incorrect",
-            "incorrect",
-            "Unknown",
-            "unknown",
-            "Unallowed",
-            "unallowed",
-            "exceeds",
-            "without active",
-            "No active",
-            "not enough",
-            "Not enough",
-            "too many",
-            "Too many",
-            "invalid",
-            "Invalid",
-            "exception",
-            "Exception",
-            "crash",
-            "Crash",
-            "cannot",
-            "Cannot",
-            "couldn't",
-            "Couldn't"
-        };
-
-        for (const char *keyword : keywords)
-        {
-            if (strstr(message, keyword))
-                return true;
-        }
-
-        return false;
+        vsnprintf_s(buffer, bufferSize, _TRUNCATE, format, args);
     }
 }
 
-void CDebug::TraceAlways(const char *format, ...)
+CDebug::CDebug()
+    : m_hFile(szLogFileName)
 {
+    Write("INFO", "Log started.");
+}
+
+CDebug::~CDebug()
+{
+    Write("INFO", "Log finished.");
+}
+
+void CDebug::Write(const char *level, const char *message)
+{
+    const std::string key = std::string(level) + "|" + message;
+
+    // Write each identical diagnostic only once per game session.
+    if (!m_writtenMessages.insert(key).second)
+        return;
+
     SYSTEMTIME t;
-    char szBuf[1024];
+    char szBuf[2048];
 
     GetLocalTime(&t);
 
-    int offset = sprintf_s(
+    sprintf_s(
         szBuf,
         sizeof(szBuf),
-        "%02d/%02d/%04d %02d:%02d:%02d.%03d ",
+        "%02d/%02d/%04d %02d:%02d:%02d.%03d [%s] %s",
         t.wDay,
         t.wMonth,
         t.wYear,
         t.wHour,
         t.wMinute,
         t.wSecond,
-        t.wMilliseconds
+        t.wMilliseconds,
+        level,
+        message
     );
-
-    va_list arg;
-    va_start(arg, format);
-    vsnprintf_s(
-        szBuf + offset,
-        sizeof(szBuf) - offset,
-        _TRUNCATE,
-        format,
-        arg
-    );
-    va_end(arg);
 
     m_hFile << szBuf << std::endl;
     m_hFile.flush();
@@ -90,19 +59,35 @@ void CDebug::TraceAlways(const char *format, ...)
     OutputDebugStringA("\n");
 }
 
+void CDebug::WriteFormatted(const char *level, const char *format, va_list args)
+{
+    char message[2048];
+    FormatMessage(message, sizeof(message), format, args);
+    Write(level, message);
+}
+
 void CDebug::Trace(const char *format, ...)
 {
-    char message[1024];
+    va_list args;
+    va_start(args, format);
+    WriteFormatted("INFO", format, args);
+    va_end(args);
+}
 
-    va_list arg;
-    va_start(arg, format);
-    vsnprintf_s(message, sizeof(message), _TRUNCATE, format, arg);
-    va_end(arg);
+void CDebug::TraceWarning(const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    WriteFormatted("WARNING", format, args);
+    va_end(args);
+}
 
-    if (!IsImportantDiagnostic(message))
-        return;
-
-    TraceAlways("%s", message);
+void CDebug::TraceError(const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    WriteFormatted("ERROR", format, args);
+    va_end(args);
 }
 
 #endif
@@ -111,7 +96,7 @@ void Error(const char *szStr)
 {
     MessageBox(nullptr, szStr, "CLEO error", MB_ICONERROR | MB_OK);
 #ifdef DEBUGIT
-    Debug.TraceAlways("[Error] %s", szStr);
+    Debug.TraceError("%s", szStr);
 #endif
     //exit(1);
 }
@@ -120,7 +105,7 @@ void Warning(const char *szStr)
 {
     MessageBox(nullptr, szStr, "CLEO warning", MB_ICONWARNING | MB_OK);
 #ifdef DEBUGIT
-    Debug.TraceAlways("[Warning] %s", szStr);
+    Debug.TraceWarning("%s", szStr);
 #endif
     //exit(1);
 }
