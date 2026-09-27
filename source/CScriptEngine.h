@@ -33,6 +33,7 @@ namespace CLEO
         void							UnregisterAllScripts();
         void							ReregisterAllScripts();
         void							RestorePendingChildScript(CCustomScript *parent, CCustomScript *child, int label);
+        void							RestorePendingScmFunctions(CCustomScript *script);
         void							RestorePendingChildTree(CCustomScript *parent);
         inline size_t				WorkingScriptsCount() { return CustomScripts.size(); }
         virtual void					Inject(CCodeInjector&);
