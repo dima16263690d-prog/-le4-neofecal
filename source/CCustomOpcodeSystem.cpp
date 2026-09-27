@@ -1831,7 +1831,7 @@ namespace CLEO {
 	//0AB2=-1,ret
 	OpcodeResult __stdcall opcode_0AB2(CRunningScript *thread)
 	{
-		auto cs = reinterpret_cast<CCustomScript*>(thread);
+		auto cs = reinterpret_cast<CCustomScript *>(thread);
 		ScmFunction *scmFunc = GetActiveScmFunction(cs);
 		DWORD nRetParams;
 
@@ -1849,72 +1849,24 @@ namespace CLEO {
 			throw "Too many parameters in opcode 0AB2";
 		}
 
-		const DWORD actualReturnArgs = CountScmVarArgs(thread);
-		if (actualReturnArgs < nRetParams)
-			throw "Not enough parameters in opcode 0AB2";
+		// Read return values while the function-local scope is still active.
+		// This is the same sequencing used by the original CLEO 4
+		// implementation and is important for local-variable destinations.
+		SCRIPT_VAR returnValues[32] = {};
 
-		if (actualReturnArgs > nRetParams)
-			TRACE("[0AB2] warning: declared %u return values but %u were provided",
-				nRetParams, actualReturnArgs);
-
-		ScmReturnValue returnValues[32];
-
-		for (DWORD i = 0; i < nRetParams; ++i)
+		if (nRetParams)
 		{
-			ScmReturnValue &value = returnValues[i];
-			const BYTE type = *thread->GetBytePointer();
-			value.isString = IsScmStringType(type);
-
-			if (value.isString)
-			{
-				char buffer[MAX_STR_LEN] = {};
-				const char *str = readString(thread, buffer, sizeof(buffer));
-				value.stringValue = str ? str : "";
-			}
-			else
-			{
-				*thread >> value.value.dwParam;
-			}
+			GetScriptParams(thread, nRetParams);
+			memcpy(returnValues, opcodeParams, nRetParams * sizeof(SCRIPT_VAR));
 		}
-
-		// Consume malformed extra return expressions before leaving the function.
-		if (actualReturnArgs > nRetParams)
-			SkipUnusedParameters(thread);
 
 		scmFunc->Return(thread);
 
-		const DWORD returnSlotCount = CountScmVarArgs(thread);
-		const DWORD writeCount = std::min(nRetParams, returnSlotCount);
-
-		if (returnSlotCount != nRetParams)
+		// Write the saved values into the caller's destinations.
+		for (DWORD i = 0; i < nRetParams; ++i)
 		{
-			TRACE("[0AB2] warning: function returned %u value(s), caller supplied %u return slot(s)",
-				nRetParams, returnSlotCount);
-		}
-
-		for (DWORD i = 0; i < writeCount; ++i)
-		{
-			if (returnValues[i].isString)
-			{
-				const BYTE destinationType = *thread->GetBytePointer();
-				if (!IsScmStringDestinationType(destinationType))
-					throw "Invalid string return destination in opcode 0AB2";
-
-				SCRIPT_VAR *destination = GetScriptParamPointer(thread);
-				if (!destination)
-					throw "Invalid string return destination in opcode 0AB2";
-
-				const size_t capacity = (destinationType == DT_VAR_TEXTLABEL ||
-					destinationType == DT_LVAR_TEXTLABEL) ? 8 : 16;
-				char *out = reinterpret_cast<char *>(destination);
-				std::fill(out, out + capacity, '\0');
-				strncpy(out, returnValues[i].stringValue.c_str(), capacity - 1);
-			}
-			else
-			{
-				opcodeParams[0] = returnValues[i].value;
-				SetScriptParams(thread, 1);
-			}
+			opcodeParams[0] = returnValues[i];
+			SetScriptParams(thread, 1);
 		}
 
 		SkipUnusedParameters(thread);
