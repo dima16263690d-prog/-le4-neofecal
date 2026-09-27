@@ -1840,7 +1840,7 @@ namespace CLEO {
 			throw "0AB2 without active 0AB1 function";
 		}
 
-		// Match CLEO 5: inspect the complete vararg list first.
+		// CLEO 5-style validation: inspect the complete return vararg list first.
 		DWORD returnVarArgCount = CountScmVarArgs(thread);
 		DWORD nRetParams = 0;
 
@@ -1862,106 +1862,26 @@ namespace CLEO {
 			throw "Too many parameters in opcode 0AB2";
 		}
 
-		// Read return values while the function-local scope is still active.
-		ScmReturnValue returnValues[32];
+		// Keep return values in a private buffer while function-local scope is active.
+		// The actual write-back uses GTA SA's native SetScriptParams() after Return(),
+		// which is the safe parameter API used by our CLEO 4 runtime.
+		SCRIPT_VAR returnValues[32] = {};
 
-		for (DWORD i = 0; i < nRetParams; ++i)
+		if (nRetParams)
 		{
-			BYTE type = *thread->GetBytePointer();
-
-			switch (type)
-			{
-			case DT_FLOAT:
-			case DT_DWORD:
-			case DT_WORD:
-			case DT_BYTE:
-			case DT_VAR:
-			case DT_LVAR:
-			case DT_VAR_ARRAY:
-			case DT_LVAR_ARRAY:
-				GetScriptParams(thread, 1);
-				returnValues[i].value = opcodeParams[0];
-				break;
-
-			case DT_VAR_STRING:
-			case DT_LVAR_STRING:
-			case DT_VAR_TEXTLABEL:
-			case DT_LVAR_TEXTLABEL:
-			case DT_VAR_STRING_ARRAY:
-			case DT_LVAR_STRING_ARRAY:
-			case DT_VAR_TEXTLABEL_ARRAY:
-			case DT_LVAR_TEXTLABEL_ARRAY:
-			case DT_STRING:
-			case DT_TEXTLABEL:
-			case DT_VARLEN_STRING:
-			{
-				const char *value = readString(thread);
-				returnValues[i].isString = true;
-				returnValues[i].stringValue = value ? value : "";
-				break;
-			}
-
-			default:
-				TRACE("[0AB2] Invalid return argument type 0x%02X", type);
-				throw "Invalid return parameter type in opcode 0AB2";
-			}
+			GetScriptParams(thread, nRetParams);
+			memcpy(returnValues, opcodeParams, nRetParams * sizeof(SCRIPT_VAR));
 		}
 
-		// Restore the caller scope and return to the caller's return-slot list.
+		// Restore caller scope and jump to its return-slot list.
 		scmFunc->Return(thread);
 		delete scmFunc;
 
-		// Match CLEO 5: count the caller's destination slots after Return().
-		DWORD returnSlotCount = CountScmVarArgs(thread);
-		if (returnSlotCount != nRetParams)
+		// Write results through the game's own parameter writer.
+		if (nRetParams)
 		{
-			TRACE("[0AB2] Function returned %u params, caller provided %u return slots",
-				nRetParams, returnSlotCount);
-		}
-
-		DWORD writeCount = std::min(nRetParams, returnSlotCount);
-
-		for (DWORD i = 0; i < writeCount; ++i)
-		{
-			BYTE type = *thread->GetBytePointer();
-
-			if (IsScmStringDestinationType(type))
-			{
-				char *destination = reinterpret_cast<char *>(GetScriptParamPointer(thread));
-				if (!destination)
-					throw "Invalid string destination in opcode 0AB2";
-
-				size_t capacity =
-					(type == DT_VAR_TEXTLABEL || type == DT_LVAR_TEXTLABEL ||
-					 type == DT_VAR_TEXTLABEL_ARRAY || type == DT_LVAR_TEXTLABEL_ARRAY) ? 8 : 16;
-
-				if (returnValues[i].isString)
-				{
-					strncpy(destination, returnValues[i].stringValue.c_str(), capacity);
-					destination[capacity - 1] = '\0';
-				}
-				else
-				{
-					destination[0] = '\0';
-				}
-
-				SkipOneScmParam(thread);
-			}
-			else if (type == DT_VAR || type == DT_LVAR ||
-					 type == DT_VAR_ARRAY || type == DT_LVAR_ARRAY)
-			{
-				SCRIPT_VAR *destination = GetScriptParamPointer(thread);
-				if (!destination)
-					throw "Invalid return destination in opcode 0AB2";
-
-				*destination = returnValues[i].value;
-				SkipOneScmParam(thread);
-			}
-			else
-			{
-				TRACE("[0AB2] Return destination is not a variable, type 0x%02X", type);
-				throw "Return destination is not a variable in opcode 0AB2";
-			}
+			memcpy(opcodeParams, returnValues, nRetParams * sizeof(SCRIPT_VAR));
+			SetScriptParams(thread, nRetParams);
 		}
 
 		SkipUnusedParameters(thread);
