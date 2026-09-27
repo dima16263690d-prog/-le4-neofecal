@@ -34,6 +34,8 @@ namespace CLEO
     class CCodeInjector
     {
         bool bAccessOpen;
+        CMemoryProtection m_textProtection;
+        CMemoryProtection m_rdataProtection;
 
     public:
         CCodeInjector() {
