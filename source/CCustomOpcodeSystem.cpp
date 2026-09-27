@@ -1680,9 +1680,14 @@ namespace CLEO {
 			}
 		}
 
-		// skip unused args
-		if (nParams > 32) 
-			GetScriptParams(thread, nParams - 32);
+		// opcodeParams is a GTA-owned 32-entry buffer.
+		// Consume additional arguments one at a time so the native collector
+		// is never asked to write beyond the 32-entry limit.
+		if (nParams > 32)
+		{
+			for (DWORD i = 32; i < nParams; ++i)
+				GetScriptParams(thread, 1);
+		}
 
 		// all areguments read
 		scmFunc->retnAddress = thread->GetBytePointer();
@@ -1712,9 +1717,30 @@ namespace CLEO {
 		ScmFunction *scmFunc = ScmFunction::Store[reinterpret_cast<CCustomScript*>(thread)->GetScmFunction()];
 		DWORD nRetParams;
 		*thread >> nRetParams;
-		if (nRetParams) GetScriptParams(thread, nRetParams);
+
+		// opcodeParams is limited to 32 entries by the original GTA engine.
+		// Read all destinations before restoring the caller scope, but never
+		// ask GTA to collect more than one parameter at a time.
+		const DWORD storedRetParams = std::min<DWORD>(nRetParams, 32);
+		SCRIPT_VAR returnParams[32] = {};
+		for (DWORD i = 0; i < storedRetParams; ++i)
+		{
+			GetScriptParams(thread, 1);
+			returnParams[i] = opcodeParams[0];
+		}
+
+		// Consume extra destinations without overflowing opcodeParams.
+		for (DWORD i = storedRetParams; i < nRetParams; ++i)
+			GetScriptParams(thread, 1);
+
 		scmFunc->Return(thread);
-		if (nRetParams) SetScriptParams(thread, nRetParams);
+
+		for (DWORD i = 0; i < storedRetParams; ++i)
+		{
+			opcodeParams[0] = returnParams[i];
+			SetScriptParams(thread, 1);
+		}
+
 		SkipUnusedParameters(thread);
 		delete scmFunc;
 		return OR_CONTINUE;
@@ -2677,8 +2703,35 @@ extern "C"
 	void WINAPI CLEO_SkipOpcodeParams(CRunningScript* thread, int count);
 	void WINAPI CLEO_ThreadJumpAtLabelPtr(CRunningScript* thread, int labelPtr);
 	int WINAPI CLEO_GetOperandType(CRunningScript* thread);
-	void WINAPI CLEO_RetrieveOpcodeParams(CRunningScript *thread, int count);
-	void WINAPI CLEO_RecordOpcodeParams(CRunningScript *thread, int count);
+	void WINAPI CLEO_RetrieveOpcodeParams(CRunningScript *thread, int count)
+	{
+		if (count <= 0)
+			return;
+
+		const DWORD requested = static_cast<DWORD>(count);
+		const DWORD stored = std::min<DWORD>(requested, 32);
+
+		// Fill only the native 32-entry opcodeParams buffer.
+		for (DWORD i = 0; i < stored; ++i)
+			GetScriptParams(thread, 1);
+
+		// Still advance the script over the remaining parameters.
+		for (DWORD i = stored; i < requested; ++i)
+			GetScriptParams(thread, 1);
+	}
+
+	void WINAPI CLEO_RecordOpcodeParams(CRunningScript *thread, int count)
+	{
+		if (count <= 0)
+			return;
+
+		const DWORD requested = static_cast<DWORD>(count);
+		const DWORD stored = std::min<DWORD>(requested, 32);
+
+		// Never ask GTA to store more than the native 32-entry buffer.
+		SetScriptParams(thread, stored);
+	}
+
 	SCRIPT_VAR * WINAPI CLEO_GetPointerToScriptVariable(CRunningScript* thread);
 	RwTexture * WINAPI CLEO_GetScriptTextureById(CRunningScript* thread, int id);
 	HSTREAM WINAPI CLEO_GetInternalAudioStream(CRunningScript* thread, CAudioStream *stream);
