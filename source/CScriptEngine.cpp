@@ -988,10 +988,6 @@ namespace CLEO
         try
         {
             std::list<CCustomScript *> savedThreads;
-            std::for_each(CustomScripts.begin(), CustomScripts.end(), [](CCustomScript *cs) {
-                if (HasActiveScmFunction(cs))
-                    TRACE("[SAVE][SCMFUNC] %.8s id=%u ip=%td", cs->Name, cs->GetScmFunction(), cs->CurrentIP - reinterpret_cast<BYTE*>(cs->BaseIP));
-            });
             std::for_each(CustomScripts.begin(), CustomScripts.end(), [this, &savedThreads](CCustomScript *cs) {
                 if ((cs->bSaveEnabled || !cs->childThreads.empty()) && cs->parentThread == nullptr)
                     savedThreads.push_back(cs);
