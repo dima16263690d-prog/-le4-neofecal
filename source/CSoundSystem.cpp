@@ -58,7 +58,12 @@ namespace CLEO
         TRACE("Injecting SoundSystem...");
         CGameVersionManager& gvm = GetInstance().VersionManager;
         CreateMainWindow = gvm.TranslateMemoryAddress(MA_CREATE_MAIN_WINDOW_FUNCTION);
-        inj.ReplaceFunction(OnCreateMainWindow, gvm.TranslateMemoryAddress(MA_CALL_CREATE_MAIN_WINDOW));
+        GetInstance().HookSystem.InstallCall(
+            inj,
+            "CreateMainWindow",
+            gvm.TranslateMemoryAddress(MA_CALL_CREATE_MAIN_WINDOW),
+            (size_t)&OnCreateMainWindow
+        );
         camera = gvm.TranslateMemoryAddress(MA_CAMERA);
         userPaused = gvm.TranslateMemoryAddress(MA_USER_PAUSE);
         codePaused = gvm.TranslateMemoryAddress(MA_CODE_PAUSE);
