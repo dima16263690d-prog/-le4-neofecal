@@ -6,6 +6,7 @@
 
 namespace CLEO
 {
+    class CCustomScript;
     const size_t MAX_STR_LEN = 0xff; // max length of string type parameter
     enum OpcodeResult : char
     {
