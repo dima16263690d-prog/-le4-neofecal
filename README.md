@@ -593,6 +593,29 @@ Log finished.
 ```
 
 После исправления двойной косвенности приложение запускается штатно. В проверенном сценарии продолжают работать SoundSystem, обычные CLEO/ModLoader `.cs`, `0A92`, `0AB1/0AB2`, завершение scripts и восстановление memory protection.
+### DrawMenuBackground — runtime-проверка (28.09.2026)
+
+Третий обычный `CALL` hook переведён на `CHookSystem`:
+
+```text
+DrawMenuBackground
+```
+
+Runtime-лог на GTA San Andreas 1.0 US подтвердил:
+
+```text
+[HookSystem] Installed CALL 'DrawMenuBackground' at 0x0057B9FD -> replacement original=0x00728350
+Creating main window...
+SoundSystem initialized
+[0A92] Starting new custom script WEAPONWHEELUI.CS
+[0AB1] ...
+[0AB2] ...
+[0AB1] test2 args=1 123 0
+[0AB2] test2 ret=1 123
+Log finished.
+```
+
+После перевода `DrawMenuBackground` продолжили работать меню, SoundSystem, обычные CLEO/ModLoader `.cs`, custom-script lifecycle и проверенные `0A92/0AB1/0AB2`. При завершении снова восстановлены все сохранённые `.text/.rdata` защиты.
 ### Что пока не переводилось
 
 - pointer patch `MA_DEF_WINDOW_PROC_PTR`;
