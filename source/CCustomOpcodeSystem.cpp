@@ -1741,10 +1741,11 @@ namespace CLEO {
 			memcpy(returnValues, opcodeParams, nRetParams * sizeof(SCRIPT_VAR));
 		}
 
-		TRACE("[0AB2] before Return: thread=%p scm=%u returns=%u retn=%p",
-			thread, scmFunc->thisScmFunctionId, nRetParams, scmFunc->retnAddress);
+		TRACE("[0AB2] before Return: name=%.*s thread=%p scm=%u returns=%u retn=%p",
+			8, thread->GetName(), thread, scmFunc->thisScmFunctionId, nRetParams, scmFunc->retnAddress);
 		scmFunc->Return(thread);
-		TRACE("[0AB2] after Return: thread=%p ip=%p", thread, thread->GetBytePointer());
+		TRACE("[0AB2] after Return: name=%.*s thread=%p ip=%p",
+			8, thread->GetName(), thread, thread->GetBytePointer());
 
 		// Write each destination separately. This preserves GTA SA semantics for
 		// globals, locals, arrays and string destinations without asking
