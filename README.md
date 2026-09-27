@@ -285,3 +285,166 @@ CCustomScript
 3. Отдельно выполнить runtime-проверку 0AB1/0AB2 на количестве параметров больше 32 без добавления тестовых файлов в основной репозиторий.
 4. Проверить сохранение и восстановление child-local state через полный Save/Load.
 5. Продолжить аудит custom-script lifecycle и вложенных parent/child.
+## Runtime verification — 0AB1/0AB2, ScmFunction и 0E6F (27.09.2026)
+
+Этот раздел фиксирует фактически выполненную runtime-проверку на **GTA San Andreas 1.0.0.0 US**. Он предназначен как постоянная техническая отметка для дальнейшей разработки и повторной проверки архитектуры.
+
+### 0AB1/0AB2 — пройденные тесты
+
+Использован синтаксис и opcode definition из **Sanny Builder 3.8.5** (`opcodes SannyBuilder-v3.8.5(1).txt`).
+
+Проверены:
+
+1. `0AB1` без параметров → `0AB2` без возврата.
+2. `0AB1` с одним параметром → `0AB2` с одним результатом: `10 → 15`.
+3. `0AB1` с двумя параметрами → `0AB2` с двумя результатами: `111, 222 → 121, 242`.
+4. Передача `ConditionResult` из функции, возвращающей `TRUE`.
+5. Передача `ConditionResult` из функции, возвращающей `FALSE`.
+6. Проверка изменения результата после `0AB1` через `004D: jump_if_false`.
+7. Проверка сохранения `TRUE` результата после `0AB1`.
+8. Вложенные функции: `MAIN → A → B → C → 0AB2`, результаты: `777 → 797 → 807`.
+9. `GOSUB` внутри `0AB1`-функции: `40 → 42`.
+
+Диагностический лог подтвердил:
+
+```
+[0AB1] testab12 args=0 0 0
+[0AB2] testab12 ret=0 0
+
+[0AB1] testab12 args=1 10 0
+[0AB2] testab12 ret=1 15
+
+[0AB1] testab12 args=2 111 222
+[0AB2] testab12 ret=2 121
+
+[0AB2] testab12 ret=1 777
+[0AB2] testab12 ret=1 797
+[0AB2] testab12 ret=1 807
+
+[0AB1] testab12 args=1 40 0
+[0AB2] testab12 ret=1 42
+```
+
+`0AB2` в текущем диагностическом сообщении печатает количество возвращаемых параметров и только **первое** значение; поэтому второе значение `242` должно подтверждаться экранным результатом тестового скрипта, а не этой одной строкой лога.
+
+### Почему ConditionResult-тест написан через 004D
+
+В используемом файле opcode definition Sanny Builder 3.8.5 строка:
+
+```
+0AB1: cleo_call @LABEL ...
+```
+
+не объявлена как `IF and SET`. Поэтому конструкция вида:
+
+```
+if
+    0AB1: cleo_call ...
+then
+```
+
+не является корректным синтаксисом для данного opcode definition.
+
+Для runtime-проверки используется:
+
+```
+0AB1: cleo_call @FUNCTION 0
+004D: jump_if_false @LABEL
+```
+
+Это позволяет проверять фактический `ConditionResult`, не изменяя opcode definition Sanny Builder.
+
+### ScmFunction — текущая архитектура
+
+В патче `ScmFunction` реализован как отдельный execution-scope поверх существующего `CCustomScript`:
+
+```
+ScmFunction
+├── prevScmFunctionId / thisScmFunctionId
+├── callArgCount / callIP / retnAddress
+├── savedBaseIP / savedCodeSize
+├── savedStack[8] / savedSP
+├── savedTls[32]
+├── savedCondResult
+├── savedLogicalOp
+├── savedNotFlag
+├── savedScriptFileDir / savedScriptFileName
+└── stringParams
+```
+
+При входе в функцию сохраняется контекст caller и создаётся чистый execution-scope. При `0AB2` восстанавливается caller, включая locals, GOSUB stack и состояние условного выражения.
+
+Вложенный тест `A → B → C` подтвердил работу цепочки `ScmFunction`, а тест с `GOSUB` подтвердил работу отдельного сохранённого GOSUB stack.
+
+### 0E6F — архитектура не заменяется
+
+**Важно для дальнейшей разработки: `0E6F` не переводится на архитектуру CLEO 5.**
+
+Наша custom-stream схема остаётся:
+
+```
+0E6F
+  ↓
+CCustomScript
+  ├── parentThread
+  ├── childThreads
+  ├── ownedBuffer
+  └── CodeSize / Save state
+```
+
+`ScmFunction` является отдельным механизмом функций и не заменяет `CCustomScript`, `parentThread`, `childThreads` или lifecycle `0E6F`.
+
+### Runtime Save/Load — 0E6F child states
+
+27.09.2026 выполнен Save/Load с тестовым `test 2potoka.cs`.
+
+При сохранении лог подтвердил:
+
+```
+Done. Saved 1024 cleo variables, 2 saved threads, 0 stopped threads
+[Cleo][Save][Custom] saved child states=3 file=./cleo/cleo_saves/cs0.children.sav
+```
+
+При загрузке:
+
+```
+Finished. Loaded 1024 cleo variables, 2 saved threads info, 0 stopped threads info
+[Cleo][LOAD][Custom] loaded child states=3 file=./cleo/cleo_saves/cs0.children.sav
+```
+
+После загрузки `0AB1/0AB2` снова выполняются без ошибки.
+
+Это подтверждает, что загрузка `csN.sav` + `csN.children.sav` не ломает последующее выполнение проверенного `0AB1/0AB2` runtime.
+
+### Что НЕ делать при следующих изменениях
+
+- Не переделывать `0E6F` под CLEO 5.
+- Не заменять `CCustomScript` моделью CLEO 5.
+- Не менять legacy layout `CRunningScript` без отдельного обоснования.
+- Не менять `.cs/.cs3/.cs4` формат ради новой архитектуры.
+- Не переносить весь CLEO 5 целиком.
+- Не использовать строковые предположения о `SCRIPT_VAR` без проверки точного типа и `GetScriptParamPointer()`.
+- Не считать диагностическую строку `ret=2 121` доказательством значения второго return — текущий лог печатает только первый result.
+- Для тестов Sanny Builder 3.8.5 использовать фактические определения из `opcodes SannyBuilder-v3.8.5(1).txt`, а не придумывать дополнительные `IF`-свойства opcode.
+
+### Следующий технический этап
+
+После завершённых базовых тестов следующий отдельный тест должен соединить две уже проверенные системы:
+
+```
+0E6F
+  ↓
+child
+  ↓
+0AB1
+  ↓
+nested 0AB1
+  ↓
+0AB2
+  ↓
+Save/Load
+  ↓
+продолжение child
+```
+
+Цель — проверить именно взаимодействие `CCustomScript/0E6F` и `ScmFunction`, не изменяя архитектуру `0E6F`.
