@@ -406,6 +406,35 @@ namespace CLEO {
 		auto paramType = *thread->GetBytePointer();
 		if (!paramType) return nullptr;
 
+		// Our CLEO string path is explicit for script string variables.
+		// Do not depend on GTA's native GetScriptStringParam() here: the
+		// custom 0AB1/0AB2 function scope can redirect local string slots
+		// into ScmFunction::savedTls. Resolve the slot ourselves and then
+		// advance the opcode stream through GetScriptParamPointer().
+		if (paramType == DT_VAR_STRING ||
+			paramType == DT_LVAR_STRING ||
+			paramType == DT_VAR_TEXTLABEL ||
+			paramType == DT_LVAR_TEXTLABEL)
+		{
+			SCRIPT_VAR *var = GetScriptParamPointer(thread);
+			const char *src = var ? var->cParam : nullptr;
+
+			if (!src)
+				return nullptr;
+
+			if (buf != nullptr)
+			{
+				if (size > 0)
+				{
+					strncpy(buf, src, size - 1);
+					buf[size - 1] = '\0';
+				}
+				return buf;
+			}
+
+			return const_cast<char *>(src);
+		}
+
 		if (paramType >= DT_DWORD && paramType <= DT_LVAR_ARRAY) // process parameter as a pointer to string
 		{
 			GetScriptParams(thread, 1);
@@ -432,7 +461,7 @@ namespace CLEO {
 
 			if (paramType == DT_VARLEN_STRING)
 			{
-				// prococess here as GetScriptStringParam can not obtain strings with lenght greater than 128
+			// process here as GetScriptStringParam can not obtain strings with length greater than 128
 				thread->IncPtr(1); // already read paramType
 
 				BYTE length = *thread->GetBytePointer(); // as unsigned!
@@ -440,8 +469,9 @@ namespace CLEO {
 
 				if (length > 0)
 				{
-					auto count = std::min(size, length);
+					auto count = std::min<size_t>(size - 1, length);
 					memcpy(buf, thread->GetBytePointer(), count);
+					buf[count] = '\0';
 
 					thread->IncPtr(length); // read text
 				}
