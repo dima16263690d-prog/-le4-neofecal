@@ -1,8 +1,9 @@
 {$CLEO .cs}
 
 // ============================================================================
-// CLEO 4.4.4 unofficial patch - minimal 0AB1 / 0AB2 function test
+// CLEO 4.4.4 unofficial patch - Sanny Builder 3.8.5 0AB1 / 0AB2 function test
 // GTA SA 1.0 US
+// Opcode syntax source: opcodes SannyBuilder-v3.8.5(1).txt
 //
 // EXPECTED:
 //   RESULT=30
@@ -13,7 +14,11 @@
 // 30, returns it through 4@, and ScmFunction::Return() must restore the
 // caller's original 0@ / 1@ values.
 //
-// This test intentionally uses the legacy CLEO 4 function opcodes only.
+// Exact Sanny Builder 3.8.5 spellings used here:
+//   0AB1: cleo_call
+//   0AB2: cleo_return
+//
+// No {$USE CLEO+} is required for this test.
 // ============================================================================
 
 thread "FTEST444"
