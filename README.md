@@ -616,6 +616,60 @@ Log finished.
 ```
 
 После перевода `DrawMenuBackground` продолжили работать меню, SoundSystem, обычные CLEO/ModLoader `.cs`, custom-script lifecycle и проверенные `0A92/0AB1/0AB2`. При завершении снова восстановлены все сохранённые `.text/.rdata` защиты.
+### OnInitScm2 — CALL runtime-проверка с 0E6F (28.09.2026)
+
+`OnInitScm2` переведён с legacy `ReplaceFunction()` на `CHookSystem::InstallCall()`.
+
+Runtime-лог на **GTA San Andreas 1.0 US** подтвердил:
+
+```text
+[HookSystem] Installed CALL 'OnInitScm2' at 0x005BA340 -> 0x6AD4DCD4 original=0x6A1C72B0
+Scripts exclusively initialized
+```
+
+После установки нового CALL продолжили работать обычные custom `.cs`, `0A92` и `0AB1/0AB2`.
+
+Дополнительно выполнен runtime-тест существующего `test 2potoka.cs`, проверяющий custom-stream архитектуру через `0E6F`.
+
+Зафиксировано:
+
+- `test 2potoka.cs` успешно загружен и зарегистрирован;
+- созданы два дополнительных custom child-stream с label `-99` и `-193`;
+- затем выполнена штатная инициализация `Scripts initialized` без crash;
+- при последующей загрузке прочитан legacy save `cs3.sav`;
+- прочитан sidecar `cs3.children.sav` с `loaded child states=3`;
+- `test 2potoka.cs` снова найден в safe-list и восстановлен как custom script;
+- завершение игры прошло без зафиксированного crash/access violation;
+- при завершении восстановлены все сохранённые `.text/.rdata` memory protection regions.
+
+Ключевой фрагмент:
+
+```text
+Starting new custom script from thread named test2 label -99
+Starting new custom script from thread named test2 label -193
+
+Loading cleo safe ./cleo/cleo_saves/cs3.sav
+Finished. Loaded 1024 cleo variables, 2 saved threads info, 0 stopped threads info
+[Cleo][Load][Custom] loaded child states=3 file=./cleo/cleo_saves/cs3.children.sav
+Custom script ..\\modloader\\cheat menu rus\\test 2potoka.cs found in the safe-list
+```
+
+Этот тест подтверждает, что перевод `OnInitScm2` на `CHookSystem` не нарушил уже проверенную цепочку:
+
+```text
+OnInitScm2
+   ↓
+загрузка custom scripts
+   ↓
+0E6F
+   ↓
+CCustomScript child lifecycle
+   ↓
+Save/Load child states
+```
+
+Архитектура `0E6F`, `parentThread`, `childThreads`, `ownedBuffer` и sidecar `csN.children.sav` не изменялась.
+
 ### CTextLocate — JUMP runtime-проверка (28.09.2026)
 
 Первый реальный **JUMP** hook через `CHookSystem` переведён с legacy `InjectFunction()` на:
@@ -691,7 +745,7 @@ HookSystem отвечает только за установку и откат n
 - hooks внутри `CScriptEngine::Inject()`;
 - остальные старые `ReplaceFunction()` / `InjectFunction()`.
 
-Pointer/data hook `MA_DEF_WINDOW_PROC_PTR` уже переведён и отдельно подтверждён в runtime, включая сохранение двойной косвенности исходной реализации.
+`OnInitScm2`, `DrawMenuBackground`, `UpdateGameLogics`, `CreateMainWindow`, `CTextLocate` и `DefWindowProc` уже имеют отдельные runtime-проверки через `CHookSystem`.
 
 ### Следующий технический этап
 
