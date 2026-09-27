@@ -510,7 +510,7 @@ Save/Load
 ```
 
 Цель — проверить именно взаимодействие `CCustomScript/0E6F` и `ScmFunction`, не изменяя архитектуру `0E6F`.
-## Этап 4 — HookSystem v1: CALL/JUMP hooks (28.09.2026)
+## Этап 4 — HookSystem v1: CALL/JUMP/POINTER hooks (28.09.2026)
 
 Добавлен первый отдельный менеджер legacy-инъекций поверх существующей 5-байтовой модели `CALL/JMP`.
 
@@ -616,17 +616,94 @@ Log finished.
 ```
 
 После перевода `DrawMenuBackground` продолжили работать меню, SoundSystem, обычные CLEO/ModLoader `.cs`, custom-script lifecycle и проверенные `0A92/0AB1/0AB2`. При завершении снова восстановлены все сохранённые `.text/.rdata` защиты.
+### CTextLocate — JUMP runtime-проверка (28.09.2026)
+
+Первый реальный **JUMP** hook через `CHookSystem` переведён с legacy `InjectFunction()` на:
+
+```text
+CTextLocate
+```
+
+Использованный патч:
+
+```cpp
+CText__Get = gvm.TranslateMemoryAddress(MA_CALL_CTEXT_LOCATE);
+GetInstance().HookSystem.InstallJump(
+    inj,
+    "CTextLocate",
+    CText__Get,
+    (size_t)CText__locate
+);
+```
+
+Runtime-лог на **GTA San Andreas 1.0 US** подтвердил установку:
+
+```text
+[HookSystem] Installed JUMP 'CTextLocate' at 0x006A0050 -> 0x6AD55321 original=0x00000000
+Creating main window...
+SoundSystem initialized
+Scripts exclusively initialized
+```
+
+После установки `CTextLocate` успешно продолжили работу:
+
+- создание главного окна;
+- SoundSystem;
+- загрузка обычных CLEO/ModLoader `.cs`;
+- `0A92` и создание `WEAPONWHEELUI.CS`;
+- `0AB1/0AB2` внутри custom-script;
+- существующий parent/child custom-stream lifecycle;
+- завершение scripts и игры без зафиксированного crash/access violation;
+- восстановление `.text/.rdata` memory protection при завершении.
+
+Важное ограничение текущей диагностики: для отдельного `test2` в этом запуске в логе присутствует `0AB1`, но строка `0AB2` перед завершением не зафиксирована. Поэтому этот конкретный запуск не используется как доказательство полного цикла `test2 0AB1 → 0AB2`; ранее полный цикл `123 → 123` уже был отдельно подтверждён.
+
+### Связь HookSystem с custom-stream архитектурой 0E6F
+
+Перевод `CTextLocate` на `JUMP` **не изменяет архитектуру `0E6F`**.
+
+Проверенная схема custom-stream остаётся:
+
+```text
+0E6F
+  ↓
+CCustomScript
+  ├── parentThread
+  ├── childThreads
+  ├── ownedBuffer
+  └── Save/Load child state
+```
+
+HookSystem отвечает только за установку и откат native memory hooks. `0E6F`, `CCustomScript`, `parentThread/childThreads` и sidecar `csN.children.sav` остаются отдельным execution/lifecycle слоем.
+
+Предыдущие runtime-проверки уже подтвердили:
+
+- создание нескольких child через `0E6F`;
+- завершение child через `0A93`;
+- сохранение child state;
+- восстановление child state после Load;
+- продолжение работы `0AB1/0AB2` после восстановления.
+
+Таким образом, текущая миграция HookSystem не подменяет и не объединяет `JUMP`-hooks с механизмом `0E6F`.
+
 ### Что пока не переводилось
 
-- pointer patch `MA_DEF_WINDOW_PROC_PTR`;
 - hooks внутри `CScriptEngine::Inject()`;
 - остальные старые `ReplaceFunction()` / `InjectFunction()`.
 
-Эти типы будут переводиться отдельно после проверки соответствующей модели patch.
+Pointer/data hook `MA_DEF_WINDOW_PROC_PTR` уже переведён и отдельно подтверждён в runtime, включая сохранение двойной косвенности исходной реализации.
 
 ### Следующий технический этап
 
-Отдельно реализовать безопасный тип **pointer/data hook**, используемый `MA_DEF_WINDOW_PROC_PTR`, с сохранением исходного значения и возможностью отката. Только после этого продолжать миграцию остальных legacy hooks.
+Продолжать миграцию оставшихся legacy hooks по одному:
+
+1. выбрать конкретный `ReplaceFunction()` / `InjectFunction()`;
+2. перевести его на соответствующий тип `CHookSystem`;
+3. собрать Win32;
+4. выполнить runtime-проверку на **GTA San Andreas 1.0 US**;
+5. только после успешной проверки фиксировать следующий hook.
+
+Execution Engine, legacy `CRunningScript`, формат старых `.cs/.cs3/.cs4` и архитектура `0E6F` при этом не изменяются.
 ## Структурный рефакторинг — 27.09.2026
 
 Выполнено безопасное разделение внутреннего кода без изменения legacy execution flow.
