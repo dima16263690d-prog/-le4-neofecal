@@ -47,7 +47,8 @@ namespace CLEO
         }
         ~CCodeInjector()
         {
-            //GetInstance().Stop();
+            // Restore all game image protections before the injector is destroyed.
+            CloseReadWriteAccess();
         };
 
         void OpenReadWriteAccess();
