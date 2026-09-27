@@ -35,6 +35,16 @@ namespace CLEO
 
 		ScmFunction(CRunningScript *thread);
 
+        // Used only by Save/Load restoration. This constructor does not
+        // modify the script execution state; the caller restores the saved
+        // fields explicitly afterwards.
+        struct RestoreTag {};
+        explicit ScmFunction(RestoreTag);
+        static ScmFunction *CreateRestored();
+
+        // Release all active function scopes owned by a custom script.
+        static void ReleaseForScript(CCustomScript *thread);
+
 		void Return(CRunningScript *thread);
     };
 
