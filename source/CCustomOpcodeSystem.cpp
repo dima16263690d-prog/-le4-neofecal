@@ -933,6 +933,7 @@ namespace CLEO {
 			  callArgCount(0),
 			  callIP(thread->GetBytePointer()),
 			  retnAddress(nullptr),
+			  ownerThread(reinterpret_cast<CCustomScript*>(thread)),
 			  savedBaseIP(nullptr),
 			  savedCodeSize(0),
 			  savedSP(0),
@@ -1828,7 +1829,8 @@ namespace CLEO {
 
 	bool HasActiveScmFunction(CCustomScript *cs)
 	{
-		return GetActiveScmFunction(cs) != nullptr;
+		ScmFunction *scmFunc = GetActiveScmFunction(cs);
+		return scmFunc && scmFunc->ownerThread == cs;
 	}
 
 	//0AB1=-1,cleo_call %1p%
